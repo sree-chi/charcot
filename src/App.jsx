@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, FileText } from 'lucide-react';
+import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, FileText, BarChart3 } from 'lucide-react';
 import { useComputerVision } from './hooks/useComputerVision';
 
 const App = () => {
@@ -177,7 +177,7 @@ const App = () => {
     generateSessionReport();
     setIsGeneratingReport(false);
     setShowReport(true);
-    setActiveTab('report');
+    setActiveTab('statistics');
   };
 
   const generateSessionReport = () => {
@@ -528,6 +528,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
             <nav className="flex gap-2 px-6">
               {[
                 { id: 'monitor', label: 'Live Monitor', icon: Activity },
+                { id: 'statistics', label: 'Final Statistics', icon: BarChart3 },
                 { id: 'report', label: 'Session Report', icon: FileText }
               ].map(tab => (
                 <button
@@ -666,6 +667,264 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
               </div>
             )}
 
+            {/* Final Statistics Tab */}
+            {activeTab === 'statistics' && (
+              <div>
+                {!sessionReport ? (
+                  <div className="text-center py-16 text-gray-500">
+                    <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                    <p className="text-lg font-medium">No statistics available</p>
+                    <p className="text-sm">Complete a session to view final statistics</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Page Header */}
+                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl p-8">
+                      <div className="flex items-center gap-3 mb-4">
+                        <BarChart3 className="w-10 h-10" />
+                        <h1 className="text-3xl font-bold">Final Statistics</h1>
+                      </div>
+                      <p className="text-blue-100">Comprehensive session metrics and behavioral analysis</p>
+                    </div>
+
+                    {/* Session Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-white border-2 border-blue-200 rounded-lg p-6">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Activity className="w-5 h-5 text-blue-600" />
+                          <p className="text-sm font-medium text-gray-600">Session Duration</p>
+                        </div>
+                        <p className="text-3xl font-bold text-gray-900">{sessionReport.duration}</p>
+                      </div>
+
+                      <div className="bg-white border-2 border-green-200 rounded-lg p-6">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Eye className="w-5 h-5 text-green-600" />
+                          <p className="text-sm font-medium text-gray-600">Avg Eye Contact</p>
+                        </div>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {metricsHistory.length > 0
+                            ? (metricsHistory.reduce((sum, m) => sum + m.eyeContact, 0) / metricsHistory.length).toFixed(1)
+                            : 0}%
+                        </p>
+                      </div>
+
+                      <div className="bg-white border-2 border-purple-200 rounded-lg p-6">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Activity className="w-5 h-5 text-purple-600" />
+                          <p className="text-sm font-medium text-gray-600">Avg Breathing</p>
+                        </div>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {metricsHistory.length > 0
+                            ? (metricsHistory.reduce((sum, m) => sum + m.breathing, 0) / metricsHistory.length).toFixed(1)
+                            : 0} bpm
+                        </p>
+                      </div>
+
+                      <div className="bg-white border-2 border-red-200 rounded-lg p-6">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle className="w-5 h-5 text-red-600" />
+                          <p className="text-sm font-medium text-gray-600">Total Alerts</p>
+                        </div>
+                        <p className="text-3xl font-bold text-gray-900">{alerts.length}</p>
+                      </div>
+                    </div>
+
+                    {/* Metrics Over Time Chart - Placeholder */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-6">
+                      <h2 className="text-xl font-bold text-gray-800 mb-4">Metrics Over Time</h2>
+                      <div className="h-80">
+                        {metricsHistory.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={metricsHistory}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="time" label={{ value: 'Time (minutes)', position: 'insideBottom', offset: -5 }} />
+                              <YAxis label={{ value: 'Value', angle: -90, position: 'insideLeft' }} />
+                              <Tooltip />
+                              <Line type="monotone" dataKey="eyeContact" stroke="#3b82f6" name="Eye Contact %" strokeWidth={2} />
+                              <Line type="monotone" dataKey="breathing" stroke="#8b5cf6" name="Breathing (bpm)" strokeWidth={2} />
+                              <Line type="monotone" dataKey="gaze" stroke="#10b981" name="Gaze Stability %" strokeWidth={2} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-gray-400">
+                            No data available
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Distribution Charts - Placeholder */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Eye Contact Distribution */}
+                      <div className="bg-white border border-gray-200 rounded-xl p-6">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4">Eye Contact Distribution</h3>
+                        <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
+                          <div className="text-center">
+                            <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                            <p className="text-gray-500 font-medium">Histogram Chart Placeholder</p>
+                            <p className="text-sm text-gray-400 mt-1">Add bar chart showing eye contact ranges</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Breathing Rate Distribution */}
+                      <div className="bg-white border border-gray-200 rounded-xl p-6">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4">Breathing Rate Distribution</h3>
+                        <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
+                          <div className="text-center">
+                            <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                            <p className="text-gray-500 font-medium">Histogram Chart Placeholder</p>
+                            <p className="text-sm text-gray-400 mt-1">Add bar chart showing breathing rate ranges</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Insights Section - Placeholder */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-6">
+                      <h2 className="text-xl font-bold text-gray-800 mb-4">Key Insights</h2>
+                      <div className="space-y-4">
+                        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded">
+                          <h4 className="font-semibold text-blue-900 mb-2">Eye Contact Analysis</h4>
+                          <p className="text-blue-800 text-sm">
+                            [Placeholder: Add insights about eye contact patterns, trends, and notable changes throughout the session]
+                          </p>
+                        </div>
+
+                        <div className="border-l-4 border-purple-500 bg-purple-50 p-4 rounded">
+                          <h4 className="font-semibold text-purple-900 mb-2">Breathing Pattern Analysis</h4>
+                          <p className="text-purple-800 text-sm">
+                            [Placeholder: Add insights about breathing patterns, stress indicators, and relaxation periods]
+                          </p>
+                        </div>
+
+                        <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded">
+                          <h4 className="font-semibold text-green-900 mb-2">Gaze Stability Analysis</h4>
+                          <p className="text-green-800 text-sm">
+                            [Placeholder: Add insights about gaze patterns, attention levels, and focus indicators]
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Aggregate Metrics Table - Placeholder */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-6">
+                      <h2 className="text-xl font-bold text-gray-800 mb-4">Aggregate Metrics</h2>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Metric</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Minimum</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Average</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Maximum</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Std Dev</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            <tr>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">Eye Contact (%)</td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                {metricsHistory.length > 0 ? Math.min(...metricsHistory.map(m => m.eyeContact)).toFixed(1) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                {metricsHistory.length > 0 ? (metricsHistory.reduce((sum, m) => sum + m.eyeContact, 0) / metricsHistory.length).toFixed(1) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                {metricsHistory.length > 0 ? Math.max(...metricsHistory.map(m => m.eyeContact)).toFixed(1) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-400">[Placeholder]</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">Breathing Rate (bpm)</td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                {metricsHistory.length > 0 ? Math.min(...metricsHistory.map(m => m.breathing)).toFixed(1) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                {metricsHistory.length > 0 ? (metricsHistory.reduce((sum, m) => sum + m.breathing, 0) / metricsHistory.length).toFixed(1) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                {metricsHistory.length > 0 ? Math.max(...metricsHistory.map(m => m.breathing)).toFixed(1) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-400">[Placeholder]</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">Gaze Stability (%)</td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                {metricsHistory.length > 0 ? Math.min(...metricsHistory.map(m => m.gaze)).toFixed(1) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                {metricsHistory.length > 0 ? (metricsHistory.reduce((sum, m) => sum + m.gaze, 0) / metricsHistory.length).toFixed(1) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                {metricsHistory.length > 0 ? Math.max(...metricsHistory.map(m => m.gaze)).toFixed(1) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center text-gray-400">[Placeholder]</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Alert Timeline - Placeholder */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-6">
+                      <h2 className="text-xl font-bold text-gray-800 mb-4">Alert Timeline</h2>
+                      {alerts.length > 0 ? (
+                        <div className="space-y-3">
+                          {alerts.map((alert, idx) => (
+                            <div key={idx} className={`flex items-start gap-3 p-3 rounded-lg ${
+                              alert.severity === 'critical' ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'
+                            }`}>
+                              <AlertCircle className={`w-5 h-5 mt-0.5 ${
+                                alert.severity === 'critical' ? 'text-red-600' : 'text-yellow-600'
+                              }`} />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <p className={`font-semibold text-sm ${
+                                    alert.severity === 'critical' ? 'text-red-900' : 'text-yellow-900'
+                                  }`}>
+                                    {alert.message}
+                                  </p>
+                                  <span className={`text-xs font-medium ${
+                                    alert.severity === 'critical' ? 'text-red-700' : 'text-yellow-700'
+                                  }`}>
+                                    Minute {alert.minute}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-400">
+                          No alerts generated during this session
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Export Options */}
+                    <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
+                      <h3 className="font-bold text-gray-800 mb-4">Export Options</h3>
+                      <div className="flex gap-4">
+                        <button
+                          onClick={exportReport}
+                          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                        >
+                          <Download className="w-5 h-5" />
+                          Export as JSON
+                        </button>
+                        <button className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition">
+                          <Download className="w-5 h-5" />
+                          Export as PDF (Coming Soon)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Session Report Tab */}
             {activeTab === 'report' && (
               <div>
@@ -712,11 +971,11 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                       </pre>
                     </div>
 
-                    {/* Claude's Analysis */}
+                    {/* Analysis Summary */}
                     <div className="bg-white border border-gray-200 rounded-lg p-6">
                       <div className="flex items-center gap-2 mb-4">
-                        <Brain className="w-6 h-6 text-indigo-600" />
-                        <h3 className="font-bold text-gray-800">Claude's Clinical Insights</h3>
+                        <FileText className="w-6 h-6 text-indigo-600" />
+                        <h3 className="font-bold text-gray-800">Session Analysis</h3>
                       </div>
                       <div className="prose prose-sm max-w-none">
                         <pre className="whitespace-pre-wrap text-gray-700 leading-relaxed">
