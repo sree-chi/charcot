@@ -14,6 +14,7 @@ export const useComputerVision = (videoRef, sessionActive, sessionPaused) => {
   const breathingHistoryRef = useRef([]);
   const gazeHistoryRef = useRef([]);
   const animationFrameRef = useRef(null);
+  const canvasRef = useRef(null);
 
   // Initialize face detector
   useEffect(() => {
@@ -65,6 +66,11 @@ export const useComputerVision = (videoRef, sessionActive, sessionPaused) => {
     console.log('🎬 Starting face detection processing loop...');
     let frameCount = 0;
 
+    // Create canvas for processing
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement('canvas');
+    }
+
     const processFrame = async () => {
       if (!videoRef.current || videoRef.current.readyState < 2) {
         animationFrameRef.current = requestAnimationFrame(processFrame);
@@ -73,12 +79,64 @@ export const useComputerVision = (videoRef, sessionActive, sessionPaused) => {
 
       try {
         frameCount++;
-        const faces = await detectorRef.current.estimateFaces(videoRef.current, {
+        const video = videoRef.current;
+
+        // Debug video state every 30 frames
+        if (frameCount % 30 === 0) {
+          console.log('Video state:', {
+            readyState: video.readyState,
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+            paused: video.paused,
+            currentTime: video.currentTime
+          });
+        }
+
+        // Draw video to canvas for better compatibility
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Check if we're getting actual video data (not just green/black screen)
+        if (frameCount === 1) {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const pixels = imageData.data;
+          let greenPixels = 0;
+          let totalPixels = pixels.length / 4;
+
+          // Sample every 100th pixel to check for solid green
+          for (let i = 0; i < pixels.length; i += 400) {
+            const r = pixels[i];
+            const g = pixels[i + 1];
+            const b = pixels[i + 2];
+            if (g > 200 && r < 100 && b < 100) {
+              greenPixels++;
+            }
+          }
+
+          const greenPercent = (greenPixels / (totalPixels / 100)) * 100;
+          console.log(`Canvas analysis: ${greenPercent.toFixed(1)}% green pixels`);
+          if (greenPercent > 80) {
+            console.warn('⚠️ WARNING: Canvas appears to be mostly green - video may not be rendering properly!');
+          }
+        }
+
+        // Use canvas instead of video element for detection
+        const faces = await detectorRef.current.estimateFaces(canvas, {
           flipHorizontal: false
         });
 
         if (frameCount % 30 === 0) {
           console.log(`Frame ${frameCount}: Detected ${faces?.length || 0} faces`);
+          if (faces && faces.length > 0) {
+            console.log('First face structure:', {
+              hasKeypoints: !!faces[0].keypoints,
+              keypointsLength: faces[0].keypoints?.length,
+              box: faces[0].box
+            });
+          }
         }
 
         if (faces && faces.length > 0) {
