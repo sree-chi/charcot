@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, Brain, FileText, Settings } from 'lucide-react';
+import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, Brain, FileText } from 'lucide-react';
+import { useComputerVision } from './hooks/useComputerVision';
 
 const App = () => {
   // Session State
@@ -10,11 +11,8 @@ const App = () => {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [patientConsent, setPatientConsent] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(true);
-  
-  // Behavioral Metrics
-  const [eyeContact, setEyeContact] = useState(0);
-  const [breathingRate, setBreathingRate] = useState(14);
-  const [gazeStability, setGazeStability] = useState(100);
+
+  // Behavioral Metrics - baselines
   const [baselineBreathing, setBaselineBreathing] = useState(14);
   const [baselineEyeContact, setBaselineEyeContact] = useState(45);
   
@@ -35,7 +33,7 @@ const App = () => {
   const videoRef = useRef(null);
   const metricsIntervalRef = useRef(null);
   const insightsIntervalRef = useRef(null);
-  
+
   // Patient Profile
   const [patientId] = useState(Math.floor(Math.random() * 9000) + 1000);
   const [patientBaseline, setPatientBaseline] = useState({
@@ -44,6 +42,13 @@ const App = () => {
     stressThreshold: 19,
     dissociationIndicator: 90
   });
+
+  // Real-time computer vision tracking
+  const { eyeContact, gazeStability, breathingRate } = useComputerVision(
+    videoRef,
+    sessionActive,
+    sessionPaused
+  );
 
   // Initialize webcam
   useEffect(() => {
@@ -74,33 +79,24 @@ const App = () => {
     return () => clearInterval(interval);
   }, [sessionActive, sessionPaused, sessionStartTime]);
 
-  // Simulate real-time metrics collection
+  // Record real-time metrics from computer vision
   useEffect(() => {
     if (sessionActive && !sessionPaused) {
       metricsIntervalRef.current = setInterval(() => {
-        // Simulate behavioral metrics with realistic variation
-        const newEyeContact = Math.max(0, Math.min(100, eyeContact + (Math.random() - 0.5) * 10));
-        const newBreathingRate = Math.max(8, Math.min(30, breathingRate + (Math.random() - 0.5) * 2));
-        const newGazeStability = Math.max(0, Math.min(100, gazeStability + (Math.random() - 0.5) * 15));
-        
-        setEyeContact(newEyeContact);
-        setBreathingRate(newBreathingRate);
-        setGazeStability(newGazeStability);
-        
-        // Record metrics
+        // Record metrics from computer vision
         const timestamp = Math.floor(sessionDuration / 60);
         setMetricsHistory(prev => [...prev, {
           time: timestamp,
-          eyeContact: Math.round(newEyeContact),
-          breathing: Math.round(newBreathingRate * 10) / 10,
-          gaze: Math.round(newGazeStability)
+          eyeContact: Math.round(eyeContact),
+          breathing: Math.round(breathingRate * 10) / 10,
+          gaze: Math.round(gazeStability)
         }]);
-        
-        // Check for alerts
-        checkForAlerts(newEyeContact, newBreathingRate, newGazeStability);
+
+        // Check for alerts based on real metrics
+        checkForAlerts(eyeContact, breathingRate, gazeStability);
       }, 3000);
     }
-    
+
     return () => clearInterval(metricsIntervalRef.current);
   }, [sessionActive, sessionPaused, sessionDuration, eyeContact, breathingRate, gazeStability]);
 
@@ -206,7 +202,7 @@ Keep it professional, non-diagnostic, and actionable. Format as plain text.`;
       alert('Patient consent is required to start session');
       return;
     }
-    
+
     setSessionActive(true);
     setSessionStartTime(Date.now());
     setSessionDuration(0);
@@ -215,13 +211,8 @@ Keep it professional, non-diagnostic, and actionable. Format as plain text.`;
     setClaudeInsights([]);
     setSessionEvents([]);
     setShowReport(false);
-    
-    // Set initial baseline from patient profile
-    setEyeContact(baselineEyeContact);
-    setBreathingRate(baselineBreathing);
-    setGazeStability(85);
-    
-    addSessionEvent('Session started', 'Baseline establishment phase');
+
+    addSessionEvent('Session started', 'Computer vision tracking initialized');
   };
 
   const pauseSession = () => {
@@ -604,8 +595,7 @@ Be specific, professional, and focus on actionable insights. Use the actual data
               {[
                 { id: 'monitor', label: 'Live Monitor', icon: Activity },
                 { id: 'insights', label: 'AI Insights', icon: Brain },
-                { id: 'report', label: 'Session Report', icon: FileText },
-                { id: 'baseline', label: 'Patient Baseline', icon: Settings }
+                { id: 'report', label: 'Session Report', icon: FileText }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -899,94 +889,6 @@ Be specific, professional, and focus on actionable insights. Use the actual data
               </div>
             )}
 
-            {/* Patient Baseline Tab */}
-            {activeTab === 'baseline' && (
-              <div className="space-y-6">
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
-                  <p className="text-sm text-blue-900">
-                    <strong>Baseline Profiling:</strong> TherapyLens learns each patient's individual 
-                    patterns to provide personalized insights. Baselines account for neurodiversity, 
-                    cultural differences, and individual variation.
-                  </p>
-                </div>
-
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h3 className="font-bold text-gray-800 mb-4">Patient #{patientId} Baseline Profile</h3>
-                  
-                  <div className="space-y-4">
-                    <div className="border-b border-gray-200 pb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Typical Eye Contact Range
-                      </label>
-                      <input
-                        type="text"
-                        value={patientBaseline.eyeContactRange}
-                        onChange={(e) => setPatientBaseline({...patientBaseline, eyeContactRange: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Autistic patients may have naturally lower ranges (20-40%)
-                      </p>
-                    </div>
-
-                    <div className="border-b border-gray-200 pb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Baseline Breathing Range (bpm)
-                      </label>
-                      <input
-                        type="text"
-                        value={patientBaseline.breathingRange}
-                        onChange={(e) => setPatientBaseline({...patientBaseline, breathingRange: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Normal adult range: 12-20 breaths per minute
-                      </p>
-                    </div>
-
-                    <div className="border-b border-gray-200 pb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Stress Response Threshold (bpm)
-                      </label>
-                      <input
-                        type="number"
-                        value={patientBaseline.stressThreshold}
-                        onChange={(e) => setPatientBaseline({...patientBaseline, stressThreshold: parseInt(e.target.value)})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Breathing rate that indicates stress/anxiety for this patient
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Dissociation Indicator (seconds)
-                      </label>
-                      <input
-                        type="number"
-                        value={patientBaseline.dissociationIndicator}
-                        onChange={(e) => setPatientBaseline({...patientBaseline, dissociationIndicator: parseInt(e.target.value)})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Duration of fixed gaze that may indicate dissociation
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-5">
-                  <h4 className="font-semibold text-purple-900 mb-2">Neurodiversity Considerations</h4>
-                  <ul className="text-sm text-purple-800 space-y-2">
-                    <li>• <strong>Autism:</strong> May have lower baseline eye contact (not anxiety)</li>
-                    <li>• <strong>ADHD:</strong> May show more gaze movement during concentration</li>
-                    <li>• <strong>Trauma:</strong> May exhibit freeze responses (fixed gaze, shallow breathing)</li>
-                    <li>• <strong>Cultural:</strong> Some cultures avoid direct eye contact as respect</li>
-                  </ul>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
