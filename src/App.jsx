@@ -421,7 +421,7 @@ Be specific, professional, and focus on actionable insights. Use the actual data
   };
 
   // Consent Modal
-  if (showConsentModal && !patientConsent) {
+  if (showConsentModal) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8">
