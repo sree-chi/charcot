@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, Brain, FileText } from 'lucide-react';
+import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, FileText } from 'lucide-react';
 import { useComputerVision } from './hooks/useComputerVision';
 
 const App = () => {
@@ -19,7 +19,6 @@ const App = () => {
   // Data Collection
   const [metricsHistory, setMetricsHistory] = useState([]);
   const [alerts, setAlerts] = useState([]);
-  const [claudeInsights, setClaudeInsights] = useState([]);
   const [sessionEvents, setSessionEvents] = useState([]);
   
   // UI State
@@ -100,13 +99,6 @@ const App = () => {
     return () => clearInterval(metricsIntervalRef.current);
   }, [sessionActive, sessionPaused, sessionDuration, eyeContact, breathingRate, gazeStability]);
 
-  // Periodic Claude insights
-  useEffect(() => {
-    if (sessionActive && !sessionPaused && sessionDuration > 0 && sessionDuration % 120 === 0) {
-      generateClaudeInsight();
-    }
-  }, [sessionDuration, sessionActive, sessionPaused]);
-
   const checkForAlerts = (ec, br, gs) => {
     const minute = Math.floor(sessionDuration / 60);
     
@@ -146,57 +138,6 @@ const App = () => {
     });
   };
 
-  const generateClaudeInsight = async () => {
-    const minute = Math.floor(sessionDuration / 60);
-    const recentMetrics = metricsHistory.slice(-20);
-    
-    if (recentMetrics.length < 5) return;
-    
-    const avgBreathing = recentMetrics.reduce((sum, m) => sum + m.breathing, 0) / recentMetrics.length;
-    const avgEyeContact = recentMetrics.reduce((sum, m) => sum + m.eyeContact, 0) / recentMetrics.length;
-    
-    const prompt = `You are an AI assistant for therapists analyzing patient behavioral patterns during a therapy session.
-
-Current session context:
-- Session duration: ${minute} minutes
-- Recent average breathing rate: ${avgBreathing.toFixed(1)} bpm (baseline: ${baselineBreathing} bpm)
-- Recent average eye contact: ${avgEyeContact.toFixed(0)}% (baseline: ${baselineEyeContact}%)
-- Patient ID: Anonymous #${patientId}
-
-Recent alerts: ${alerts.slice(-3).map(a => a.message).join('; ')}
-
-Provide a brief (2-3 sentences) therapeutic insight about what these patterns might indicate. Focus on:
-1. What the physiological changes suggest emotionally
-2. A gentle suggestion for the therapist to consider
-
-Keep it professional, non-diagnostic, and actionable. Format as plain text.`;
-
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 200,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-      
-      const data = await response.json();
-      const insight = data.content[0].text;
-      
-      setClaudeInsights(prev => [...prev, {
-        minute,
-        insight,
-        timestamp: new Date()
-      }].slice(-10));
-    } catch (error) {
-      console.error('Error generating Claude insight:', error);
-    }
-  };
-
   const startSession = () => {
     if (!patientConsent) {
       alert('Patient consent is required to start session');
@@ -208,7 +149,6 @@ Keep it professional, non-diagnostic, and actionable. Format as plain text.`;
     setSessionDuration(0);
     setMetricsHistory([]);
     setAlerts([]);
-    setClaudeInsights([]);
     setSessionEvents([]);
     setShowReport(false);
 
@@ -221,94 +161,61 @@ Keep it professional, non-diagnostic, and actionable. Format as plain text.`;
                      sessionPaused ? 'Tracking resumed' : 'Tracking paused at therapist request');
   };
 
-  const endSession = async () => {
+  const endSession = () => {
     setSessionActive(false);
     setSessionPaused(false);
-    
+
     if (videoStream) {
       videoStream.getTracks().forEach(track => track.stop());
       setVideoStream(null);
     }
-    
+
     addSessionEvent('Session ended', `Total duration: ${formatDuration(sessionDuration)}`);
-    
+
     // Generate comprehensive report
     setIsGeneratingReport(true);
-    await generateSessionReport();
+    generateSessionReport();
     setIsGeneratingReport(false);
     setShowReport(true);
     setActiveTab('report');
   };
 
-  const generateSessionReport = async () => {
+  const generateSessionReport = () => {
     // Analyze session data
     const timeline = analyzeTimeline();
-    
-    const prompt = `You are an AI assistant generating a post-session behavioral analysis report for a therapist.
 
-SESSION DATA:
-Duration: ${formatDuration(sessionDuration)}
-Patient: Anonymous ID #${patientId}
-Baseline Profile:
-- Typical eye contact: ${patientBaseline.eyeContactRange}
-- Baseline breathing: ${patientBaseline.breathingRange}
-- Stress threshold: ${patientBaseline.stressThreshold}+ bpm
+    // Simple analysis summary without Claude
+    const avgBreathing = metricsHistory.length > 0
+      ? metricsHistory.reduce((sum, m) => sum + m.breathing, 0) / metricsHistory.length
+      : 0;
+    const avgEyeContact = metricsHistory.length > 0
+      ? metricsHistory.reduce((sum, m) => sum + m.eyeContact, 0) / metricsHistory.length
+      : 0;
+    const avgGaze = metricsHistory.length > 0
+      ? metricsHistory.reduce((sum, m) => sum + m.gaze, 0) / metricsHistory.length
+      : 0;
 
-BEHAVIORAL TIMELINE:
-${timeline}
+    const analysis = `SESSION SUMMARY
 
-ALERTS GENERATED:
-${alerts.map(a => `[Min ${a.minute}] ${a.message}`).join('\n')}
+AVERAGE METRICS:
+• Eye Contact: ${avgEyeContact.toFixed(1)}% (Baseline: ${baselineEyeContact}%)
+• Breathing Rate: ${avgBreathing.toFixed(1)} bpm (Baseline: ${baselineBreathing} bpm)
+• Gaze Stability: ${avgGaze.toFixed(1)}%
 
-INSIGHTS DURING SESSION:
-${claudeInsights.map(i => `[Min ${i.minute}] ${i.insight}`).join('\n')}
+ALERTS GENERATED: ${alerts.length}
+${alerts.map(a => `• [Min ${a.minute}] ${a.message}`).join('\n')}
 
-Generate a comprehensive clinical report with the following sections:
-1. PATTERNS IDENTIFIED (3-4 key behavioral patterns observed)
-2. RECOMMENDATIONS FOR NEXT SESSION (4-5 specific, actionable recommendations)
-3. NEURODIVERSITY CONSIDERATIONS (any patterns suggesting ADHD, autism, or trauma responses)
+Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, ${alerts.filter(a => a.severity === 'warning').length} warnings`;
 
-Be specific, professional, and focus on actionable insights. Use the actual data provided. Format with clear headers and bullet points.`;
-
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-      
-      const data = await response.json();
-      const analysis = data.content[0].text;
-      
-      setSessionReport({
-        duration: formatDuration(sessionDuration),
-        patientId,
-        timeline,
-        alerts: alerts.length,
-        insights: claudeInsights.length,
-        analysis,
-        metricsHistory,
-        timestamp: new Date()
-      });
-    } catch (error) {
-      console.error('Error generating report:', error);
-      setSessionReport({
-        duration: formatDuration(sessionDuration),
-        patientId,
-        timeline,
-        alerts: alerts.length,
-        insights: claudeInsights.length,
-        analysis: 'Report generation failed. Please review raw metrics.',
-        metricsHistory,
-        timestamp: new Date()
-      });
-    }
+    setSessionReport({
+      duration: formatDuration(sessionDuration),
+      patientId,
+      timeline,
+      alerts: alerts.length,
+      analysis,
+      metricsHistory,
+      timestamp: new Date()
+    });
   };
 
   const analyzeTimeline = () => {
@@ -364,7 +271,6 @@ Be specific, professional, and focus on actionable insights. Use the actual data
       timestamp: sessionReport.timestamp.toISOString(),
       metrics: {
         totalAlerts: sessionReport.alerts,
-        totalInsights: sessionReport.insights,
         baselineBreathing: baselineBreathing,
         baselineEyeContact: baselineEyeContact
       },
@@ -497,10 +403,10 @@ Be specific, professional, and focus on actionable insights. Use the actual data
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Brain className="w-8 h-8 text-indigo-600" />
+              <Eye className="w-8 h-8 text-indigo-600" />
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">TherapyLens</h1>
-                <p className="text-sm text-gray-500">AI-Powered Behavioral Insights</p>
+                <p className="text-sm text-gray-500">Real-Time Behavioral Tracking</p>
               </div>
             </div>
             
@@ -588,13 +494,41 @@ Be specific, professional, and focus on actionable insights. Use the actual data
           )}
         </div>
 
+
+        {/* Video element - always rendered for computer vision */}
+        <div className={activeTab === 'monitor' ? '' : 'hidden'}>
+          <div className="bg-white rounded-xl shadow-md mb-6">
+            <div className="bg-gray-900 rounded-lg overflow-hidden aspect-video relative">
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                className="w-full h-full object-cover"
+              />
+              {sessionActive && !sessionPaused && (
+                <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg">
+                  <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                  <span className="text-white font-semibold text-sm">TRACKING ACTIVE</span>
+                </div>
+              )}
+              {!sessionActive && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                  <div className="text-center">
+                    <Camera className="w-16 h-16 text-white mx-auto mb-3 opacity-50" />
+                    <p className="text-white text-lg font-semibold">Start session to begin tracking</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-md mb-6">
           <div className="border-b border-gray-200">
             <nav className="flex gap-2 px-6">
               {[
                 { id: 'monitor', label: 'Live Monitor', icon: Activity },
-                { id: 'insights', label: 'AI Insights', icon: Brain },
                 { id: 'report', label: 'Session Report', icon: FileText }
               ].map(tab => (
                 <button
@@ -671,30 +605,6 @@ Be specific, professional, and focus on actionable insights. Use the actual data
                   </div>
                 </div>
 
-                {/* Video Feed */}
-                <div className="bg-gray-900 rounded-lg overflow-hidden aspect-video relative">
-                  <video 
-                    ref={videoRef} 
-                    autoPlay 
-                    muted 
-                    className="w-full h-full object-cover"
-                  />
-                  {sessionActive && !sessionPaused && (
-                    <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg">
-                      <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                      <span className="text-white font-semibold text-sm">TRACKING ACTIVE</span>
-                    </div>
-                  )}
-                  {!sessionActive && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                      <div className="text-center">
-                        <Camera className="w-16 h-16 text-white mx-auto mb-3 opacity-50" />
-                        <p className="text-white text-lg font-semibold">Start session to begin tracking</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 {/* Metrics Chart */}
                 {metricsHistory.length > 0 && (
                   <div className="bg-gray-50 rounded-lg p-6">
@@ -757,57 +667,14 @@ Be specific, professional, and focus on actionable insights. Use the actual data
               </div>
             )}
 
-            {/* AI Insights Tab */}
-            {activeTab === 'insights' && (
-              <div className="space-y-4">
-                <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-6">
-                  <p className="text-sm text-indigo-900">
-                    <strong>Whisper Mode:</strong> Claude analyzes behavioral patterns every 2 minutes 
-                    and provides gentle therapeutic insights. These are suggestions, not diagnoses.
-                  </p>
-                </div>
-
-                {claudeInsights.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Brain className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                    <p className="text-lg font-medium">No insights yet</p>
-                    <p className="text-sm">Claude will generate insights every 2 minutes during active sessions</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {claudeInsights.slice().reverse().map((insight, idx) => (
-                      <div key={idx} className="bg-white border border-indigo-200 rounded-lg p-5">
-                        <div className="flex items-start gap-3">
-                          <div className="bg-indigo-100 rounded-full p-2">
-                            <Brain className="w-5 h-5 text-indigo-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-semibold text-indigo-600">
-                                Minute {insight.minute}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {insight.timestamp.toLocaleTimeString()}
-                              </span>
-                            </div>
-                            <p className="text-gray-700 leading-relaxed">{insight.insight}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Session Report Tab */}
             {activeTab === 'report' && (
               <div>
                 {isGeneratingReport ? (
                   <div className="text-center py-16">
                     <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-4"></div>
-                    <p className="text-lg font-semibold text-gray-700">Generating comprehensive report...</p>
-                    <p className="text-sm text-gray-500 mt-2">Analyzing behavioral patterns with Claude AI</p>
+                    <p className="text-lg font-semibold text-gray-700">Generating report...</p>
+                    <p className="text-sm text-gray-500 mt-2">Analyzing behavioral patterns</p>
                   </div>
                 ) : !sessionReport ? (
                   <div className="text-center py-16 text-gray-500">
@@ -860,14 +727,10 @@ Be specific, professional, and focus on actionable insights. Use the actual data
                     </div>
 
                     {/* Metrics Summary */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 max-w-md">
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <p className="text-sm text-blue-600 font-medium">Total Alerts Generated</p>
                         <p className="text-3xl font-bold text-blue-700">{sessionReport.alerts}</p>
-                      </div>
-                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <p className="text-sm text-purple-600 font-medium">AI Insights Provided</p>
-                        <p className="text-3xl font-bold text-purple-700">{sessionReport.insights}</p>
                       </div>
                     </div>
 
