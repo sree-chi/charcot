@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**TherapyLens** is a frontend-only React application that provides AI-powered behavioral insights for therapists through real-time eye tracking and breathing analysis. The application processes webcam data locally in the browser, sends anonymized behavioral patterns to Claude API for therapeutic insights, and maintains strict privacy standards (no video/audio recording, local-only processing).
+**TherapyLens** is a frontend-only React application that provides real-time behavioral tracking for therapists through eye tracking, breathing analysis, and gaze stability monitoring. The application processes webcam data locally in the browser using MediaPipe FaceMesh computer vision, and maintains strict privacy standards (no video/audio recording, local-only processing, no external API calls).
 
 ## Development Commands
 
@@ -25,13 +25,33 @@ npm run preview
 npm run lint
 ```
 
+## Dependencies
+
+### Computer Vision Stack
+- `@tensorflow/tfjs-core` - TensorFlow.js core library
+- `@tensorflow/tfjs-converter` - Model conversion utilities
+- `@tensorflow/tfjs-backend-webgl` - WebGL acceleration for TensorFlow
+- `@tensorflow-models/face-landmarks-detection` - Face landmark detection API
+- `@mediapipe/face_mesh` - MediaPipe FaceMesh model
+- `@mediapipe/pose` - MediaPipe Pose (installed but not yet used)
+
+### UI Libraries
+- `react` / `react-dom` - React framework
+- `recharts` - Chart visualization library
+- `lucide-react` - Icon library
+- `@google/genai` - Google Generative AI (installed but not used)
+
+### Development Tools
+- `vite` - Build tool and dev server
+- `@vitejs/plugin-react` - React plugin for Vite
+- `tailwindcss` / `autoprefixer` / `postcss` - CSS framework and processors
+- `eslint` - Code linting
+
 ## Critical Runtime Requirements
 
 - **Webcam access requires HTTPS or localhost** - Vite config includes commented-out HTTPS option in `vite.config.js:12`. Enable for real webcam testing.
-- **Claude API calls require authentication** - Current implementation in `src/App.jsx:179-189` omits `x-api-key` header. Add via environment variable:
-  - Create `.env` with `VITE_ANTHROPIC_KEY=your_key`
-  - Add header: `'x-api-key': import.meta.env.VITE_ANTHROPIC_KEY`
-  - Ensure `.env` is in `.gitignore`
+- **DroidCam support** - Application supports using iPhone/mobile cameras via DroidCam. The webcam selector will enumerate all available cameras and prefer DroidCam devices when detected.
+- **TensorFlow.js and MediaPipe** - Computer vision runs entirely in the browser. First load may take longer as models download.
 
 ## Architecture
 
@@ -39,23 +59,33 @@ npm run lint
 
 - **Frontend-only**: No backend server. All processing happens in browser.
 - **State management**: React hooks (no Redux/Zustand). Complex state lives in `src/App.jsx`.
-- **Data flow**: Simulated metrics → Alerts system → Claude API analysis → UI display
+- **Data flow**: Webcam → MediaPipe FaceMesh → Computer vision metrics → Alerts system → UI display
 - **Storage**: Browser memory only. Export functionality provides anonymous JSON reports.
+- **No external API calls**: All AI/Claude features have been removed. The application is now fully local.
 
 ### Key Files
 
 - **`src/App.jsx`** (primary file, ~800 lines)
   - Session lifecycle management
-  - Simulated behavioral metrics generation (eye contact, breathing, gaze)
+  - Integration with computer vision hook for real-time metrics
   - Alert logic with configurable thresholds
-  - Claude API integration for real-time insights and post-session reports
-  - All UI components (tabs, charts, modals)
+  - Session report generation (metrics summary without AI)
+  - All UI components (2 tabs: Live Monitor, Session Report)
+
+- **`src/hooks/useComputerVision.js`** (computer vision engine)
+  - MediaPipe FaceMesh integration (468 facial landmarks)
+  - Real-time eye contact calculation (nose position relative to camera center)
+  - Gaze stability tracking (movement variance analysis)
+  - Breathing rate estimation (facial movement patterns)
+  - Canvas-based video processing for DroidCam compatibility
 
 - **`src/main.jsx`** - React entry point, mounts App component
 
 - **`tailwind.config.js`** - Custom color tokens under `theme.extend.colors.therapy` (primary, secondary, success, warning, danger, info). Use these for consistent branding.
 
 - **`vite.config.js`** - Dev server config (port 3000, HTTPS comment, manual chunks for React and charts)
+
+- **`src/ML/emotions.py`** - Stub file for future emotion recognition (not currently used)
 
 ### Data Schema
 
@@ -82,42 +112,60 @@ npm run lint
 
 ## Configuration & Thresholds
 
-### Alert Thresholds (src/App.jsx:114-140)
+### Alert Thresholds (src/App.jsx)
 
-Hardcoded values that trigger behavioral alerts:
+Hardcoded values in the `checkForAlerts` function that trigger behavioral alerts:
 - Hyperventilation: `breathingRate > 25` bpm → Critical alert
 - Breathing increase: `breathingRate > baseline * 1.5` → Warning
 - Low eye contact: `eyeContact < 20%` (after 45s) → Warning
 - Dissociation indicator: `gazeStability > 95%` (after 90s) → Warning
 - Anxiety indicator: `gazeStability < 30%` → Warning
 
-### Claude Insights Frequency (src/App.jsx:109)
+### Baseline Values (src/App.jsx:15-16)
 
-Triggered every 2 minutes when `sessionDuration % 120 === 0`. Modify the modulo value to change frequency (e.g., `% 180` for every 3 minutes).
-
-### Patient Baselines (src/App.jsx:18-19)
-
-Default values:
+Default baseline values used for alert comparisons:
 - `baselineBreathing: 14` bpm
 - `baselineEyeContact: 45%`
 
-These can be adjusted per-patient in the "Patient Baseline" tab UI.
+These are hardcoded and cannot be adjusted through the UI (Patient Baseline tab was removed).
 
-## Claude API Integration
+## Computer Vision Implementation
 
-Two API call sites in `src/App.jsx`:
+The application uses **real computer vision** via the custom hook `src/hooks/useComputerVision.js`:
 
-1. **Real-time insights** (`generateClaudeInsight`, line 153-201)
-   - Called every 2 minutes during active session
-   - Sends recent metrics averages and alerts
-   - Returns 2-3 sentence therapeutic guidance
-   - Model: `claude-sonnet-4-20250514`, max_tokens: 200
+### MediaPipe FaceMesh Integration
 
-2. **Post-session report** (`generateSessionReport`, line 252+)
-   - Called when session ends
-   - Comprehensive analysis with timeline and patterns
-   - Returns structured clinical insights
-   - Model: `claude-sonnet-4-20250514`, max_tokens: 1000
+- **Model**: MediaPipeFaceMesh with 468 facial landmarks
+- **Runtime**: TensorFlow.js (tfjs backend with WebGL acceleration)
+- **Processing**: Canvas-based frame processing for DroidCam compatibility
+- **Configuration**: `refineLandmarks: true`, `maxFaces: 1`
+
+### Metric Calculations (see `src/hooks/useComputerVision.js`)
+
+1. **Eye Contact** (`calculateEyeContact`, line 187-224)
+   - Uses nose tip landmark (index 1) position
+   - Calculates deviation from camera center
+   - Formula: `100 - ((xDeviation + yDeviation) / 2) * 2`
+   - Returns percentage (0-100%)
+
+2. **Gaze Stability** (`calculateGazeStability`, line 227-270)
+   - Tracks nose tip movement over 2 seconds (~60 frames)
+   - Calculates variance in position
+   - Formula: `100 - (variance / 5)`
+   - Lower variance = higher stability
+
+3. **Breathing Rate** (`calculateBreathing`, line 273-341)
+   - Monitors nose-to-mouth distance changes
+   - Detects peaks in 10-second window
+   - Counts peaks as breath cycles
+   - Converts to breaths per minute (clamped 8-30 bpm)
+
+### Important Technical Notes
+
+- **Video element persistence**: Video must stay mounted in the DOM even when switching tabs (controlled via CSS visibility, not conditional rendering)
+- **Canvas workaround**: Video frames are drawn to canvas before face detection to solve DroidCam green screen issues
+- **Frame rate**: Processes every frame via `requestAnimationFrame`
+- **Debug logging**: Extensive console logging every 30 frames for troubleshooting
 
 ## Privacy & Security Architecture
 
@@ -132,7 +180,7 @@ Two API call sites in `src/App.jsx`:
 - Anonymized behavioral metrics (eye contact %, breathing rate, gaze stability)
 - Timestamps and durations
 - Alert notifications
-- AI-generated insights (no patient identifiers sent to API)
+- Session reports (metrics summary only, no AI analysis)
 
 **Data lifecycle:**
 1. During session: metrics in React state
@@ -141,20 +189,40 @@ Two API call sites in `src/App.jsx`:
 
 ## Implementation Status
 
-### Currently Simulated (not real computer vision)
-- Eye tracking (simulated in `src/App.jsx:78-105`)
-- Breathing rate detection (random variation around baseline)
-- Gaze stability tracking (simulated fluctuations)
+### Currently Implemented (Real Computer Vision)
+- ✅ Eye contact tracking via MediaPipe FaceMesh (nose position analysis)
+- ✅ Breathing rate estimation via facial movement patterns
+- ✅ Gaze stability tracking via head movement variance
+- ✅ Real-time face detection (468 facial landmarks)
+- ✅ DroidCam/iPhone camera support
 
-### Future Integration Points
-- WebGazer.js for real eye tracking
-- MediaPipe Pose for actual breathing detection via chest movement
+### Future Enhancement Opportunities
+- MediaPipe Pose for chest-based breathing detection (more accurate than facial movement)
+- WebGazer.js for pupil-based eye tracking (more precise than nose position)
 - Facial expression micro-analysis
+- Blink rate detection
 - src/ML/emotions.py (stub for future emotion recognition)
 
-## Known Issues
+## Known Issues & Critical Patterns
 
-- **Export mismatch** (copilot-instructions.md, line 45): `src/App.jsx` defines `const App = () => {...}` but may export as `TherapyLens`. Verify export is `export default App;` to match import in `src/main.jsx:3`.
+### Video Element Management
+- **CRITICAL**: Video element must be rendered at all times, even when tab is not active
+- Use CSS (`className={activeTab === 'monitor' ? '' : 'hidden'}`) to show/hide, NOT conditional rendering
+- If video element is unmounted, computer vision stops working and camera feed is lost
+- Reason: `videoRef` must maintain continuous access to stream for MediaPipe processing
+
+### DroidCam Green Screen
+- Some browser/DroidCam combinations show green video element but actual pixels are correct
+- Solution: Canvas-based rendering (implemented in `useComputerVision.js`)
+- Video frames are drawn to canvas before face detection
+
+### Common Bugs to Avoid
+- ❌ Don't conditionally render video element based on `activeTab`
+- ❌ Don't call `async` functions that don't actually await anything
+- ❌ Don't reference removed state variables (e.g., `claudeInsights` was removed)
+- ✅ DO keep video element always mounted
+- ✅ DO use CSS to control visibility
+- ✅ DO verify all state variables exist before using them
 
 ## Styling & UI
 
@@ -173,7 +241,15 @@ When adding features, maintain local-only processing. Never add server-side pers
 All metric generation and alert checking happens in `useEffect` hooks watching `sessionActive`, `sessionPaused`, and `sessionDuration`. Metrics are pushed to `metricsHistory` array every 3 seconds.
 
 ### Tab-Based UI
-Main interface uses tab navigation (`activeTab` state: 'monitor', 'insights', 'baseline', 'alerts', 'privacy'). Each tab renders different content within the main component.
+Main interface uses tab navigation with 2 tabs:
+- `'monitor'` - Live Monitor: Shows webcam feed, real-time metrics, and charts
+- `'report'` - Session Report: Shows post-session analysis and export options
+
+Removed tabs (no longer in application):
+- ~~AI Insights~~ - Removed (no Claude API integration)
+- ~~Patient Baseline~~ - Removed (baselines are hardcoded)
+- ~~Alerts~~ - Alerts are shown inline in the monitor view
+- ~~Privacy~~ - Privacy info moved to consent modal
 
 ## Browser Compatibility
 
@@ -181,10 +257,39 @@ Main interface uses tab navigation (`activeTab` state: 'monitor', 'insights', 'b
 - WebRTC for webcam (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
 - ES6+ JavaScript support
 - CSS Grid and Flexbox
-- Fetch API for Claude calls
+- WebGL support (for TensorFlow.js backend)
+- Sufficient GPU/CPU for real-time video processing
 
 ## Debugging Tips
 
-- **Webcam not working**: Check HTTPS/localhost requirement, browser permissions, console errors from `navigator.mediaDevices.getUserMedia`
-- **Claude calls failing**: Check Network tab for API errors, verify API key in headers, or mock responses for offline dev
-- **Metrics not updating**: Ensure session is started AND not paused, check `metricsIntervalRef` in console
+### Webcam Issues
+- Check HTTPS/localhost requirement
+- Verify browser permissions for camera access
+- Look for errors from `navigator.mediaDevices.getUserMedia` in console
+- For DroidCam: Ensure DroidCam app is running and camera is accessible
+- Green screen: Check if canvas workaround is being used in `useComputerVision.js`
+
+### Face Detection Not Working
+- Open browser console and look for MediaPipe/TensorFlow errors
+- Check if detector initialization completed: Look for "✅ Face detector initialized successfully"
+- Verify face is in frame and well-lit
+- Check frame count logs (logged every 30 frames): "Frame 30: Detected X faces"
+- Ensure video dimensions are valid (not 0x0)
+
+### Metrics Not Updating
+- Ensure session is started AND not paused
+- Check that video element has valid dimensions
+- Verify computer vision hook is receiving `sessionActive=true` and `sessionPaused=false`
+- Look for face detection success in console: Should show "Detected 1 faces"
+- Check that `metricsIntervalRef` is running (metrics update every 3 seconds)
+
+### Camera Stops When Switching Tabs
+- **Root cause**: Video element got conditionally unmounted
+- **Fix**: Ensure video element is always rendered, use CSS to hide: `className={activeTab === 'monitor' ? '' : 'hidden'}`
+- Never use `{activeTab === 'monitor' && <video ... />}` pattern
+
+### Performance Issues
+- Check browser Task Manager for high CPU/GPU usage
+- TensorFlow.js may take time to initialize on first load
+- Consider reducing processing frequency if needed (currently processes every frame)
+- Check WebGL is available: `console.log(navigator.gpu)`

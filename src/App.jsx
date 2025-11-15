@@ -291,7 +291,6 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
     if (confirm('Are you sure you want to permanently delete all session data? This cannot be undone.')) {
       setMetricsHistory([]);
       setAlerts([]);
-      setClaudeInsights([]);
       setSessionEvents([]);
       setSessionReport(null);
       setShowReport(false);
