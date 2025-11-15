@@ -14,7 +14,7 @@ const App = () => {
 
   // Behavioral Metrics - baselines
   const [baselineBreathing, setBaselineBreathing] = useState(14);
-  const [baselineEyeContact, setBaselineEyeContact] = useState(45);
+  const [baselineEyeContact, setBaselineEyeContact] = useState(90);
   
   // Data Collection
   const [metricsHistory, setMetricsHistory] = useState([]);
@@ -32,11 +32,12 @@ const App = () => {
   const videoRef = useRef(null);
   const metricsIntervalRef = useRef(null);
   const insightsIntervalRef = useRef(null);
+  const currentMetricsRef = useRef({ eyeContact: 0, breathingRate: 0, gazeStability: 0, sessionDuration: 0 });
 
   // Patient Profile
   const [patientId] = useState(Math.floor(Math.random() * 9000) + 1000);
   const [patientBaseline, setPatientBaseline] = useState({
-    eyeContactRange: '45-55%',
+    eyeContactRange: '80-100%',
     breathingRange: '13-16 bpm',
     stressThreshold: 19,
     dissociationIndicator: 90
@@ -67,6 +68,16 @@ const App = () => {
     };
   }, [sessionActive, sessionPaused]);
 
+  // Keep ref updated with current metrics
+  useEffect(() => {
+    currentMetricsRef.current = {
+      eyeContact,
+      breathingRate,
+      gazeStability,
+      sessionDuration
+    };
+  }, [eyeContact, breathingRate, gazeStability, sessionDuration]);
+
   // Session timer
   useEffect(() => {
     let interval;
@@ -81,23 +92,43 @@ const App = () => {
   // Record real-time metrics from computer vision
   useEffect(() => {
     if (sessionActive && !sessionPaused) {
+      console.log('📝 Starting metrics recording interval...');
       metricsIntervalRef.current = setInterval(() => {
+        // Get current metrics from ref
+        const { eyeContact, breathingRate, gazeStability, sessionDuration } = currentMetricsRef.current;
+
         // Record metrics from computer vision
         const timestamp = Math.floor(sessionDuration / 60);
-        setMetricsHistory(prev => [...prev, {
+        const newMetric = {
           time: timestamp,
           eyeContact: Math.round(eyeContact),
           breathing: Math.round(breathingRate * 10) / 10,
           gaze: Math.round(gazeStability)
-        }]);
+        };
+
+        console.log('💾 Recording metric:', newMetric);
+        setMetricsHistory(prev => {
+          const updated = [...prev, newMetric];
+          console.log('📊 Metrics history now has', updated.length, 'entries');
+          return updated;
+        });
 
         // Check for alerts based on real metrics
         checkForAlerts(eyeContact, breathingRate, gazeStability);
       }, 3000);
+    } else {
+      if (metricsIntervalRef.current) {
+        console.log('⏸️ Clearing metrics interval');
+        clearInterval(metricsIntervalRef.current);
+      }
     }
 
-    return () => clearInterval(metricsIntervalRef.current);
-  }, [sessionActive, sessionPaused, sessionDuration, eyeContact, breathingRate, gazeStability]);
+    return () => {
+      if (metricsIntervalRef.current) {
+        clearInterval(metricsIntervalRef.current);
+      }
+    };
+  }, [sessionActive, sessionPaused]);
 
   const checkForAlerts = (ec, br, gs) => {
     const minute = Math.floor(sessionDuration / 60);
@@ -181,41 +212,149 @@ const App = () => {
   };
 
   const generateSessionReport = () => {
+    console.log('🔍 Generating session report...');
+    console.log('📊 Metrics history length:', metricsHistory.length);
+    console.log('📊 Metrics history:', metricsHistory);
+
     // Analyze session data
     const timeline = analyzeTimeline();
 
-    // Simple analysis summary without Claude
-    const avgBreathing = metricsHistory.length > 0
-      ? metricsHistory.reduce((sum, m) => sum + m.breathing, 0) / metricsHistory.length
-      : 0;
-    const avgEyeContact = metricsHistory.length > 0
-      ? metricsHistory.reduce((sum, m) => sum + m.eyeContact, 0) / metricsHistory.length
-      : 0;
-    const avgGaze = metricsHistory.length > 0
-      ? metricsHistory.reduce((sum, m) => sum + m.gaze, 0) / metricsHistory.length
-      : 0;
+    if (metricsHistory.length === 0) {
+      console.log('⚠️ No metrics data available');
+      setSessionReport({
+        duration: formatDuration(sessionDuration),
+        patientId,
+        timeline: 'No data collected',
+        alerts: alerts.length,
+        analysis: 'No metrics data available',
+        metricsHistory: [],
+        timestamp: new Date(),
+        statistics: null
+      });
+      return;
+    }
+
+    // Calculate comprehensive statistics
+    const statistics = calculateComprehensiveStatistics();
+    console.log('📈 Calculated statistics:', statistics);
+
+    // Generate insights based on actual data
+    const insights = generateDataInsights(statistics);
+    console.log('💡 Generated insights:', insights);
 
     const analysis = `SESSION SUMMARY
 
 AVERAGE METRICS:
-• Eye Contact: ${avgEyeContact.toFixed(1)}% (Baseline: ${baselineEyeContact}%)
-• Breathing Rate: ${avgBreathing.toFixed(1)} bpm (Baseline: ${baselineBreathing} bpm)
-• Gaze Stability: ${avgGaze.toFixed(1)}%
+• Eye Contact: ${statistics.eyeContact.avg.toFixed(1)}% (Baseline: ${baselineEyeContact}%)
+• Breathing Rate: ${statistics.breathing.avg.toFixed(1)} bpm (Baseline: ${baselineBreathing} bpm)
+• Gaze Stability: ${statistics.gaze.avg.toFixed(1)}%
 
 ALERTS GENERATED: ${alerts.length}
 ${alerts.map(a => `• [Min ${a.minute}] ${a.message}`).join('\n')}
 
 Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, ${alerts.filter(a => a.severity === 'warning').length} warnings`;
 
-    setSessionReport({
+    const reportData = {
       duration: formatDuration(sessionDuration),
       patientId,
       timeline,
       alerts: alerts.length,
       analysis,
       metricsHistory,
-      timestamp: new Date()
-    });
+      timestamp: new Date(),
+      statistics,
+      insights
+    };
+
+    console.log('✅ Final session report:', reportData);
+    setSessionReport(reportData);
+  };
+
+  // Calculate comprehensive statistics for all metrics
+  const calculateComprehensiveStatistics = () => {
+    if (metricsHistory.length === 0) return null;
+
+    const calculateStats = (values) => {
+      const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+
+      // Calculate standard deviation
+      const squaredDiffs = values.map(v => Math.pow(v - avg, 2));
+      const variance = squaredDiffs.reduce((sum, v) => sum + v, 0) / values.length;
+      const stdDev = Math.sqrt(variance);
+
+      return { avg, min, max, stdDev, count: values.length };
+    };
+
+    const eyeContactValues = metricsHistory.map(m => m.eyeContact);
+    const breathingValues = metricsHistory.map(m => m.breathing);
+    const gazeValues = metricsHistory.map(m => m.gaze);
+
+    return {
+      eyeContact: calculateStats(eyeContactValues),
+      breathing: calculateStats(breathingValues),
+      gaze: calculateStats(gazeValues),
+      sessionLength: sessionDuration,
+      dataPoints: metricsHistory.length
+    };
+  };
+
+  // Generate insights based on actual data patterns
+  const generateDataInsights = (stats) => {
+    if (!stats) return null;
+
+    const insights = {
+      eyeContact: '',
+      breathing: '',
+      gaze: ''
+    };
+
+    // Eye Contact Analysis
+    const eyeContactDiff = stats.eyeContact.avg - baselineEyeContact;
+    const eyeContactVariability = stats.eyeContact.stdDev;
+
+    if (stats.eyeContact.avg < 30) {
+      insights.eyeContact = `Low eye contact observed throughout session (avg ${stats.eyeContact.avg.toFixed(1)}%, baseline ${baselineEyeContact}%). This may indicate discomfort, avoidance, or neurodivergent communication patterns. Range: ${stats.eyeContact.min.toFixed(1)}%-${stats.eyeContact.max.toFixed(1)}%.`;
+    } else if (eyeContactDiff > 10) {
+      insights.eyeContact = `Above-baseline eye contact (avg ${stats.eyeContact.avg.toFixed(1)}% vs baseline ${baselineEyeContact}%). Patient shows good engagement. Variability of ${eyeContactVariability.toFixed(1)}% suggests ${eyeContactVariability > 15 ? 'fluctuating' : 'consistent'} attention patterns.`;
+    } else if (eyeContactDiff < -10) {
+      insights.eyeContact = `Below-baseline eye contact (avg ${stats.eyeContact.avg.toFixed(1)}% vs baseline ${baselineEyeContact}%). May indicate stress, distraction, or topic-related discomfort. Standard deviation: ${eyeContactVariability.toFixed(1)}%.`;
+    } else {
+      insights.eyeContact = `Eye contact within normal range (avg ${stats.eyeContact.avg.toFixed(1)}%, baseline ${baselineEyeContact}%). Variability (σ=${eyeContactVariability.toFixed(1)}%) shows ${eyeContactVariability > 20 ? 'high fluctuation - possibly topic-dependent' : 'stable engagement'}.`;
+    }
+
+    // Breathing Pattern Analysis
+    const breathingDiff = stats.breathing.avg - baselineBreathing;
+    const breathingVariability = stats.breathing.stdDev;
+    const elevatedBreathingPercent = metricsHistory.filter(m => m.breathing > baselineBreathing * 1.3).length / metricsHistory.length * 100;
+
+    if (stats.breathing.avg > baselineBreathing * 1.3) {
+      insights.breathing = `Elevated breathing rate throughout session (avg ${stats.breathing.avg.toFixed(1)} bpm vs baseline ${baselineBreathing} bpm). This suggests sustained stress or anxiety. Maximum rate: ${stats.breathing.max.toFixed(1)} bpm. Consider stress-reduction techniques.`;
+    } else if (stats.breathing.max > 25) {
+      insights.breathing = `Hyperventilation episodes detected (max ${stats.breathing.max.toFixed(1)} bpm). While average breathing was ${stats.breathing.avg.toFixed(1)} bpm, ${elevatedBreathingPercent.toFixed(0)}% of session showed elevated rates. May indicate acute stress responses.`;
+    } else if (breathingVariability > 4) {
+      insights.breathing = `Highly variable breathing patterns (σ=${breathingVariability.toFixed(1)} bpm). Average ${stats.breathing.avg.toFixed(1)} bpm with range ${stats.breathing.min.toFixed(1)}-${stats.breathing.max.toFixed(1)} bpm. Suggests emotional reactivity during session.`;
+    } else {
+      insights.breathing = `Stable breathing patterns (avg ${stats.breathing.avg.toFixed(1)} bpm, baseline ${baselineBreathing} bpm). Low variability (σ=${breathingVariability.toFixed(1)}) indicates consistent calm state throughout session.`;
+    }
+
+    // Gaze Stability Analysis
+    const gazeVariability = stats.gaze.stdDev;
+    const lowGazePercent = metricsHistory.filter(m => m.gaze < 30).length / metricsHistory.length * 100;
+    const highGazePercent = metricsHistory.filter(m => m.gaze > 95).length / metricsHistory.length * 100;
+
+    if (stats.gaze.avg > 90) {
+      insights.gaze = `Very high gaze stability (avg ${stats.gaze.avg.toFixed(1)}%). Fixed stare patterns observed ${highGazePercent.toFixed(0)}% of session. May indicate dissociation, intense focus, or freeze response. Monitor for trauma-related responses.`;
+    } else if (stats.gaze.avg < 40) {
+      insights.gaze = `Low gaze stability (avg ${stats.gaze.avg.toFixed(1)}%). Rapid eye movement observed ${lowGazePercent.toFixed(0)}% of session. May indicate anxiety, ADHD-related patterns, or environmental distractibility.`;
+    } else if (gazeVariability > 25) {
+      insights.gaze = `Highly variable gaze patterns (σ=${gazeVariability.toFixed(1)}%). Stability ranged from ${stats.gaze.min.toFixed(1)}% to ${stats.gaze.max.toFixed(1)}%. Suggests alternating between focused attention and distraction.`;
+    } else {
+      insights.gaze = `Balanced gaze stability (avg ${stats.gaze.avg.toFixed(1)}%, σ=${gazeVariability.toFixed(1)}%). Healthy range between fixation and movement. Indicates good attentional control and engagement.`;
+    }
+
+    return insights;
   };
 
   const analyzeTimeline = () => {
@@ -306,8 +445,8 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
   };
 
   const getEyeContactStatus = () => {
-    if (eyeContact < 20) return 'text-red-500';
-    if (eyeContact < 40) return 'text-yellow-500';
+    if (eyeContact < 60) return 'text-red-500';
+    if (eyeContact < 75) return 'text-yellow-500';
     return 'text-green-500';
   };
 
@@ -670,6 +809,12 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
             {/* Final Statistics Tab */}
             {activeTab === 'statistics' && (
               <div>
+                {(() => {
+                  console.log('📊 Statistics Tab - sessionReport:', sessionReport);
+                  console.log('📊 Statistics Tab - sessionReport.statistics:', sessionReport?.statistics);
+                  console.log('📊 Statistics Tab - sessionReport.insights:', sessionReport?.insights);
+                  return null;
+                })()}
                 {!sessionReport ? (
                   <div className="text-center py-16 text-gray-500">
                     <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-30" />
@@ -695,6 +840,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                           <p className="text-sm font-medium text-gray-600">Session Duration</p>
                         </div>
                         <p className="text-3xl font-bold text-gray-900">{sessionReport.duration}</p>
+                        <p className="text-xs text-gray-500 mt-1">{sessionReport.statistics?.dataPoints || 0} data points</p>
                       </div>
 
                       <div className="bg-white border-2 border-green-200 rounded-lg p-6">
@@ -703,9 +849,10 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                           <p className="text-sm font-medium text-gray-600">Avg Eye Contact</p>
                         </div>
                         <p className="text-3xl font-bold text-gray-900">
-                          {metricsHistory.length > 0
-                            ? (metricsHistory.reduce((sum, m) => sum + m.eyeContact, 0) / metricsHistory.length).toFixed(1)
-                            : 0}%
+                          {sessionReport.statistics?.eyeContact.avg.toFixed(1) || 0}%
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          σ = {sessionReport.statistics?.eyeContact.stdDev.toFixed(1) || 0}%
                         </p>
                       </div>
 
@@ -715,9 +862,10 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                           <p className="text-sm font-medium text-gray-600">Avg Breathing</p>
                         </div>
                         <p className="text-3xl font-bold text-gray-900">
-                          {metricsHistory.length > 0
-                            ? (metricsHistory.reduce((sum, m) => sum + m.breathing, 0) / metricsHistory.length).toFixed(1)
-                            : 0} bpm
+                          {sessionReport.statistics?.breathing.avg.toFixed(1) || 0} bpm
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          σ = {sessionReport.statistics?.breathing.stdDev.toFixed(1) || 0} bpm
                         </p>
                       </div>
 
@@ -727,6 +875,9 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                           <p className="text-sm font-medium text-gray-600">Total Alerts</p>
                         </div>
                         <p className="text-3xl font-bold text-gray-900">{alerts.length}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {alerts.filter(a => a.severity === 'critical').length} critical, {alerts.filter(a => a.severity === 'warning').length} warnings
+                        </p>
                       </div>
                     </div>
 
@@ -781,90 +932,107 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                       </div>
                     </div>
 
-                    {/* Key Insights Section - Placeholder */}
+                    {/* Key Insights Section */}
                     <div className="bg-white border border-gray-200 rounded-xl p-6">
                       <h2 className="text-xl font-bold text-gray-800 mb-4">Key Insights</h2>
-                      <div className="space-y-4">
-                        <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded">
-                          <h4 className="font-semibold text-blue-900 mb-2">Eye Contact Analysis</h4>
-                          <p className="text-blue-800 text-sm">
-                            [Placeholder: Add insights about eye contact patterns, trends, and notable changes throughout the session]
-                          </p>
-                        </div>
+                      {sessionReport.insights ? (
+                        <div className="space-y-4">
+                          <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded">
+                            <h4 className="font-semibold text-blue-900 mb-2">Eye Contact Analysis</h4>
+                            <p className="text-blue-800 text-sm">
+                              {sessionReport.insights.eyeContact}
+                            </p>
+                          </div>
 
-                        <div className="border-l-4 border-purple-500 bg-purple-50 p-4 rounded">
-                          <h4 className="font-semibold text-purple-900 mb-2">Breathing Pattern Analysis</h4>
-                          <p className="text-purple-800 text-sm">
-                            [Placeholder: Add insights about breathing patterns, stress indicators, and relaxation periods]
-                          </p>
-                        </div>
+                          <div className="border-l-4 border-purple-500 bg-purple-50 p-4 rounded">
+                            <h4 className="font-semibold text-purple-900 mb-2">Breathing Pattern Analysis</h4>
+                            <p className="text-purple-800 text-sm">
+                              {sessionReport.insights.breathing}
+                            </p>
+                          </div>
 
-                        <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded">
-                          <h4 className="font-semibold text-green-900 mb-2">Gaze Stability Analysis</h4>
-                          <p className="text-green-800 text-sm">
-                            [Placeholder: Add insights about gaze patterns, attention levels, and focus indicators]
-                          </p>
+                          <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded">
+                            <h4 className="font-semibold text-green-900 mb-2">Gaze Stability Analysis</h4>
+                            <p className="text-green-800 text-sm">
+                              {sessionReport.insights.gaze}
+                            </p>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <p className="text-gray-500 text-center py-4">No insights available</p>
+                      )}
                     </div>
 
-                    {/* Aggregate Metrics Table - Placeholder */}
+                    {/* Aggregate Metrics Table */}
                     <div className="bg-white border border-gray-200 rounded-xl p-6">
                       <h2 className="text-xl font-bold text-gray-800 mb-4">Aggregate Metrics</h2>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Metric</th>
-                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Minimum</th>
-                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Average</th>
-                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Maximum</th>
-                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Std Dev</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            <tr>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">Eye Contact (%)</td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {metricsHistory.length > 0 ? Math.min(...metricsHistory.map(m => m.eyeContact)).toFixed(1) : '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {metricsHistory.length > 0 ? (metricsHistory.reduce((sum, m) => sum + m.eyeContact, 0) / metricsHistory.length).toFixed(1) : '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {metricsHistory.length > 0 ? Math.max(...metricsHistory.map(m => m.eyeContact)).toFixed(1) : '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-400">[Placeholder]</td>
-                            </tr>
-                            <tr>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">Breathing Rate (bpm)</td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {metricsHistory.length > 0 ? Math.min(...metricsHistory.map(m => m.breathing)).toFixed(1) : '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {metricsHistory.length > 0 ? (metricsHistory.reduce((sum, m) => sum + m.breathing, 0) / metricsHistory.length).toFixed(1) : '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {metricsHistory.length > 0 ? Math.max(...metricsHistory.map(m => m.breathing)).toFixed(1) : '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-400">[Placeholder]</td>
-                            </tr>
-                            <tr>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">Gaze Stability (%)</td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {metricsHistory.length > 0 ? Math.min(...metricsHistory.map(m => m.gaze)).toFixed(1) : '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {metricsHistory.length > 0 ? (metricsHistory.reduce((sum, m) => sum + m.gaze, 0) / metricsHistory.length).toFixed(1) : '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {metricsHistory.length > 0 ? Math.max(...metricsHistory.map(m => m.gaze)).toFixed(1) : '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-400">[Placeholder]</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
+                      {sessionReport.statistics ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Metric</th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Minimum</th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Average</th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Maximum</th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Std Dev (σ)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              <tr>
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900">Eye Contact (%)</td>
+                                <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                  {sessionReport.statistics.eyeContact.min.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center font-semibold text-gray-900">
+                                  {sessionReport.statistics.eyeContact.avg.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                  {sessionReport.statistics.eyeContact.max.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center text-indigo-600 font-medium">
+                                  {sessionReport.statistics.eyeContact.stdDev.toFixed(1)}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900">Breathing Rate (bpm)</td>
+                                <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                  {sessionReport.statistics.breathing.min.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center font-semibold text-gray-900">
+                                  {sessionReport.statistics.breathing.avg.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                  {sessionReport.statistics.breathing.max.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center text-indigo-600 font-medium">
+                                  {sessionReport.statistics.breathing.stdDev.toFixed(1)}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900">Gaze Stability (%)</td>
+                                <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                  {sessionReport.statistics.gaze.min.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center font-semibold text-gray-900">
+                                  {sessionReport.statistics.gaze.avg.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center text-gray-600">
+                                  {sessionReport.statistics.gaze.max.toFixed(1)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center text-indigo-600 font-medium">
+                                  {sessionReport.statistics.gaze.stdDev.toFixed(1)}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          <div className="mt-4 text-xs text-gray-500 text-center">
+                            Based on {sessionReport.statistics.dataPoints} data points collected over {sessionReport.duration}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-center py-4">No statistics available</p>
+                      )}
                     </div>
 
                     {/* Alert Timeline - Placeholder */}
