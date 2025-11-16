@@ -32,6 +32,11 @@ const App = () => {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [sessionReport, setSessionReport] = useState(null);
   const [videoStream, setVideoStream] = useState(null);
+
+  // Camera dragging state
+  const [cameraPosition, setCameraPosition] = useState({ x: window.innerWidth - 260, y: window.innerHeight - 300 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
   // Refs
   const videoRef = useRef(null);
@@ -580,6 +585,41 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
     return 'text-green-500';
   };
 
+  // Camera dragging handlers
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - cameraPosition.x,
+      y: e.clientY - cameraPosition.y
+    });
+  };
+
+  const handleMouseMove = (e) => {
+    if (isDragging) {
+      setCameraPosition({
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Add global mouse event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset]);
+
   // Consent Modal
   if (showConsentModal) {
     return (
@@ -674,7 +714,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
 
 
         {/* Video element - small aesthetic camera view for computer vision */}
-        {/* Only visible during active recording session */}
+        {/* Only visible during active recording session - draggable */}
         <video
           ref={videoRef}
           autoPlay
@@ -682,11 +722,12 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
           muted
           width="240"
           height="180"
+          onMouseDown={handleMouseDown}
           className="rounded-lg shadow-2xl border-4 border-white transition-opacity duration-300"
           style={{
             position: 'fixed',
-            bottom: '120px',
-            right: '20px',
+            left: `${cameraPosition.x}px`,
+            top: `${cameraPosition.y}px`,
             width: '240px',
             height: '180px',
             zIndex: 50,
@@ -694,7 +735,9 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
             transform: 'scaleX(-1)', // Mirror the video for more natural appearance
             opacity: sessionActive ? 1 : 0,
             pointerEvents: sessionActive ? 'auto' : 'none',
-            visibility: sessionActive ? 'visible' : 'hidden'
+            visibility: sessionActive ? 'visible' : 'hidden',
+            cursor: isDragging ? 'grabbing' : 'grab',
+            userSelect: 'none'
           }}
         />
 
