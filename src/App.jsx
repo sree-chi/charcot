@@ -699,7 +699,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
         />
 
         {/* Fullscreen Psychiatric Assessment iframe */}
-        <div className="relative w-full" style={{ height: '100vh' }}>
+        <div className="relative w-full">
           {/* Session Status Indicator */}
           {sessionActive && !sessionPaused && (
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg shadow-lg">
@@ -708,15 +708,14 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
             </div>
           )}
 
-          {/* Assessment iframe - fullscreen */}
+          {/* Assessment iframe - full height without scrollbar */}
           <iframe
             src="https://charcot.lovable.app/"
             title="Psychiatric Assessment with Camera"
-            className="w-full h-full border-0"
-            style={{ overflow: 'hidden' }}
+            className="w-full border-0"
+            style={{ height: '120vh' }}
             allow="microphone; camera; fullscreen"
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-            scrolling="no"
           />
         </div>
 
