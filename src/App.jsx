@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar } from 'recharts';
 import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, FileText, BarChart3, ClipboardList, Smile } from 'lucide-react';
 import { useComputerVision } from './hooks/useComputerVision';
+import { useEmotionDetection } from './hooks/useEmotionDetection';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -11,6 +12,8 @@ const App = () => {
   const [sessionPaused, setSessionPaused] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [sessionDuration, setSessionDuration] = useState(0);
+  const [pausedTime, setPausedTime] = useState(0); // Track total paused duration
+  const [lastPauseTime, setLastPauseTime] = useState(null); // Track when pause started
   const [patientConsent, setPatientConsent] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(true);
 
@@ -48,6 +51,13 @@ const App = () => {
 
   // Real-time computer vision tracking
   const { eyeContact, gazeStability, breathingRate } = useComputerVision(
+    videoRef,
+    sessionActive,
+    sessionPaused
+  );
+
+  // Real-time emotion detection
+  const { currentEmotion, emotionConfidence, isModelLoaded } = useEmotionDetection(
     videoRef,
     sessionActive,
     sessionPaused
@@ -111,16 +121,18 @@ const App = () => {
     }
   }, [eyeContact, breathingRate, gazeStability, sessionDuration, sessionActive, sessionPaused]);
 
-  // Session timer
+  // Session timer - accounts for paused time
   useEffect(() => {
     let interval;
     if (sessionActive && !sessionPaused && sessionStartTime) {
       interval = setInterval(() => {
-        setSessionDuration(Math.floor((Date.now() - sessionStartTime) / 1000));
+        const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+        const actualDuration = elapsed - pausedTime;
+        setSessionDuration(actualDuration);
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [sessionActive, sessionPaused, sessionStartTime]);
+  }, [sessionActive, sessionPaused, sessionStartTime, pausedTime]);
 
   // Record real-time metrics from computer vision
   useEffect(() => {
@@ -211,18 +223,33 @@ const App = () => {
     setSessionActive(true);
     setSessionStartTime(Date.now());
     setSessionDuration(0);
+    setPausedTime(0);
+    setLastPauseTime(null);
     setMetricsHistory([]);
     setAlerts([]);
     setSessionEvents([]);
     setShowReport(false);
 
     addSessionEvent('Session started', 'Computer vision tracking initialized');
+    console.log('🎬 Session started at', new Date().toLocaleTimeString());
   };
 
   const pauseSession = () => {
-    setSessionPaused(!sessionPaused);
-    addSessionEvent(sessionPaused ? 'Session resumed' : 'Session paused', 
-                     sessionPaused ? 'Tracking resumed' : 'Tracking paused at therapist request');
+    if (sessionPaused) {
+      // Resuming - calculate how long we were paused
+      const pauseDuration = Math.floor((Date.now() - lastPauseTime) / 1000);
+      setPausedTime(prev => prev + pauseDuration);
+      setLastPauseTime(null);
+      setSessionPaused(false);
+      addSessionEvent('Session resumed', `Resumed after ${pauseDuration} seconds`);
+      console.log(`▶️ Session resumed. Was paused for ${pauseDuration} seconds. Total paused time: ${pausedTime + pauseDuration}s`);
+    } else {
+      // Pausing - record when we paused
+      setLastPauseTime(Date.now());
+      setSessionPaused(true);
+      addSessionEvent('Session paused', 'Tracking paused at therapist request');
+      console.log('⏸️ Session paused at', new Date().toLocaleTimeString());
+    }
   };
 
   const endSession = () => {
@@ -613,64 +640,9 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <ClipboardList className="w-8 h-8 text-indigo-600" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800">Charcot</h1>
-                <p className="text-sm text-gray-500">Clinical Decision Support</p>
-              </div>
-              <div className="ml-6 text-sm text-gray-600">
-                Patient: <span className="font-semibold">#{patientId}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {sessionActive && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-green-100 rounded-lg">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="font-mono font-semibold text-green-800">{formatDuration(sessionDuration)}</span>
-                </div>
-              )}
-
-              {/* Session Controls */}
-              {!sessionActive ? (
-                <button
-                  onClick={startSession}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition text-sm"
-                >
-                  <Play className="w-4 h-4" />
-                  Start Session
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={pauseSession}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition text-sm"
-                  >
-                    {sessionPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-                    {sessionPaused ? 'Resume' : 'Pause'}
-                  </button>
-                  <button
-                    onClick={endSession}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition text-sm"
-                  >
-                    <StopCircle className="w-4 h-4" />
-                    End Session
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-screen bg-white">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="w-full">
         {/* Session Paused Notice */}
         {sessionPaused && (
           <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg mb-6">
@@ -681,59 +653,85 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
         )}
 
 
-        {/* Video element - always rendered for computer vision */}
-        {/* Hidden video for computer vision - still runs for behavioral tracking */}
+        {/* Video element - small aesthetic camera view for computer vision */}
+        {/* Only visible during active recording session */}
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          width="640"
-          height="480"
+          width="240"
+          height="180"
+          className="rounded-lg shadow-2xl border-4 border-white transition-opacity duration-300"
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '640px',
-            height: '480px',
-            opacity: 0,
-            pointerEvents: 'none',
-            zIndex: -1
+            bottom: '120px',
+            right: '20px',
+            width: '240px',
+            height: '180px',
+            zIndex: 50,
+            objectFit: 'cover',
+            transform: 'scaleX(-1)', // Mirror the video for more natural appearance
+            opacity: sessionActive ? 1 : 0,
+            pointerEvents: sessionActive ? 'auto' : 'none',
+            visibility: sessionActive ? 'visible' : 'hidden'
           }}
         />
 
-        {/* Psychiatric Assessment iframe - replaces visible camera */}
-        <div className={activeTab === 'monitor' ? '' : 'hidden'}>
-          <div className="bg-white rounded-xl shadow-md mb-6 overflow-hidden">
-            <div className="relative">
-              {/* Session Status Indicator */}
-              {sessionActive && !sessionPaused && (
-                <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg shadow-lg">
-                  <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                  <span className="text-white font-semibold text-sm">TRACKING ACTIVE</span>
-                </div>
-              )}
-
-              {/* Assessment iframe */}
-              <div style={{ height: '500px' }}>
-                <iframe
-                  src="https://charcot.lovable.app/"
-                  title="Psychiatric Assessment with Camera"
-                  className="w-full h-full border-0"
-                  allow="microphone; camera; fullscreen"
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-                />
-              </div>
-
-              {/* Info badge */}
-              <div className="absolute bottom-4 right-4 bg-therapy-primary/90 text-white px-3 py-1.5 rounded-lg text-xs backdrop-blur-sm">
-                <div className="flex items-center gap-1.5">
-                  <ClipboardList className="w-3.5 h-3.5" />
-                  <span className="font-medium">Psychiatric Assessment</span>
-                </div>
-              </div>
+        {/* Fullscreen Psychiatric Assessment iframe */}
+        <div className="relative w-full" style={{ height: '100vh' }}>
+          {/* Session Status Indicator */}
+          {sessionActive && !sessionPaused && (
+            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg shadow-lg">
+              <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+              <span className="text-white font-semibold text-sm">RECORDING ACTIVE</span>
             </div>
-          </div>
+          )}
+
+          {/* Assessment iframe - fullscreen */}
+          <iframe
+            src="https://charcot.lovable.app/"
+            title="Psychiatric Assessment with Camera"
+            className="w-full h-full border-0"
+            style={{ overflow: 'hidden' }}
+            allow="microphone; camera; fullscreen"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+            scrolling="no"
+          />
+        </div>
+
+        {/* Session Controls - Below iframe */}
+        <div className="bg-white border-y border-gray-200 p-4 flex items-center justify-center gap-3">
+          {!sessionActive ? (
+            <button
+              onClick={startSession}
+              className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
+            >
+              <Play className="w-5 h-5" />
+              Start Recording
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 px-4 py-2 bg-green-100 rounded-lg">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="font-mono font-semibold text-green-800">{formatDuration(sessionDuration)}</span>
+              </div>
+              <button
+                onClick={pauseSession}
+                className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition"
+              >
+                {sessionPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                {sessionPaused ? 'Resume Recording' : 'Pause Recording'}
+              </button>
+              <button
+                onClick={endSession}
+                className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+              >
+                <StopCircle className="w-5 h-5" />
+                End Recording
+              </button>
+            </>
+          )}
         </div>
 
         {/* Tabs */}
@@ -742,8 +740,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
             <nav className="flex gap-2 px-6">
               {[
                 { id: 'monitor', label: 'Live Monitor & Assessment', icon: Activity },
-                { id: 'statistics', label: 'Final Statistics', icon: BarChart3 },
-                { id: 'report', label: 'Session Report', icon: FileText }
+                { id: 'statistics', label: 'Final Statistics', icon: BarChart3 }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -825,13 +822,13 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                         <Smile className="w-4 h-4 text-amber-600" />
                         <span className="font-semibold text-gray-700 text-sm">Current Emotion</span>
                       </div>
-                      <CheckCircle className="w-4 h-4 text-amber-600" />
+                      <CheckCircle className={`w-4 h-4 ${isModelLoaded ? 'text-amber-600' : 'text-gray-400'}`} />
                     </div>
                     <div className="text-2xl font-bold text-amber-700 capitalize">
-                      Happy
+                      {currentEmotion}
                     </div>
                     <div className="text-xs text-gray-600 mt-1">
-                      AI-detected mood
+                      {isModelLoaded ? `${emotionConfidence}% confidence` : 'Loading AI model...'}
                     </div>
                   </div>
                 </div>
@@ -896,20 +893,6 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                   </div>
                 )}
 
-                {/* Privacy & Info Notice */}
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-blue-800 mb-1">Integrated Assessment & Tracking</p>
-                      <p className="text-sm text-blue-700">
-                        The psychiatric assessment tool above is externally hosted. Your behavioral metrics
-                        (eye contact, breathing, gaze) are tracked locally via hidden camera for privacy.
-                        No video is recorded or transmitted.
-                      </p>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -1252,91 +1235,6 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                           <Download className="w-5 h-5" />
                           Export as PDF
                         </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Session Report Tab */}
-            {activeTab === 'report' && (
-              <div>
-                {isGeneratingReport ? (
-                  <div className="text-center py-16">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-4"></div>
-                    <p className="text-lg font-semibold text-gray-700">Generating report...</p>
-                    <p className="text-sm text-gray-500 mt-2">Analyzing behavioral patterns</p>
-                  </div>
-                ) : !sessionReport ? (
-                  <div className="text-center py-16 text-gray-500">
-                    <FileText className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                    <p className="text-lg font-medium">No session report available</p>
-                    <p className="text-sm">Complete a session to generate a comprehensive analysis report</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Report Header */}
-                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg p-6">
-                      <h2 className="text-2xl font-bold mb-2">Session Analysis Report</h2>
-                      <div className="grid grid-cols-3 gap-4 mt-4">
-                        <div>
-                          <p className="text-indigo-200 text-sm">Duration</p>
-                          <p className="text-xl font-semibold">{sessionReport.duration}</p>
-                        </div>
-                        <div>
-                          <p className="text-indigo-200 text-sm">Patient ID</p>
-                          <p className="text-xl font-semibold">#{sessionReport.patientId}</p>
-                        </div>
-                        <div>
-                          <p className="text-indigo-200 text-sm">Generated</p>
-                          <p className="text-xl font-semibold">
-                            {sessionReport.timestamp.toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Timeline */}
-                    <div className="bg-white border border-gray-200 rounded-lg p-6">
-                      <h3 className="font-bold text-gray-800 mb-4">Behavioral Timeline</h3>
-                      <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded">
-{sessionReport.timeline}
-                      </pre>
-                    </div>
-
-                    {/* Analysis Summary */}
-                    <div className="bg-white border border-gray-200 rounded-lg p-6">
-                      <div className="flex items-center gap-2 mb-4">
-                        <FileText className="w-6 h-6 text-indigo-600" />
-                        <h3 className="font-bold text-gray-800">Session Analysis</h3>
-                      </div>
-                      <div className="prose prose-sm max-w-none">
-                        <pre className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-{sessionReport.analysis}
-                        </pre>
-                      </div>
-                    </div>
-
-                    {/* Metrics Summary */}
-                    <div className="grid grid-cols-1 gap-4 max-w-md">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <p className="text-sm text-blue-600 font-medium">Total Alerts Generated</p>
-                        <p className="text-3xl font-bold text-blue-700">{sessionReport.alerts}</p>
-                      </div>
-                    </div>
-
-                    {/* Privacy Notice */}
-                    <div className="bg-green-50 border-l-4 border-green-500 p-4">
-                      <div className="flex items-start gap-2">
-                        <Shield className="w-5 h-5 text-green-600 mt-0.5" />
-                        <div>
-                          <p className="font-semibold text-green-800 mb-1">Privacy Confirmed</p>
-                          <p className="text-sm text-green-700">
-                            This report contains only anonymized behavioral metrics. No audio or video 
-                            was recorded. All data is stored locally and can be deleted at any time.
-                          </p>
-                        </div>
                       </div>
                     </div>
                   </div>
