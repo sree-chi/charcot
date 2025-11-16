@@ -713,7 +713,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
             src="https://charcot.lovable.app/"
             title="Psychiatric Assessment with Camera"
             className="w-full border-0"
-            style={{ height: '120vh' }}
+            style={{ height: '200vh' }}
             allow="microphone; camera; fullscreen"
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
           />
