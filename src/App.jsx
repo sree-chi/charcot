@@ -779,32 +779,29 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
           }}
         />
 
-        {/* Page 1: Assessment iframe */}
-        {activePage === 'assessment' && (
-          <div className="relative w-full">
-            {/* Session Status Indicator */}
-            {sessionActive && !sessionPaused && (
-              <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg shadow-lg">
-                <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                <span className="text-white font-semibold text-sm">RECORDING ACTIVE</span>
-              </div>
-            )}
+        {/* Page 1: Assessment iframe - Always mounted, controlled by CSS visibility */}
+        <div className={`relative w-full ${activePage === 'assessment' ? '' : 'hidden'}`}>
+          {/* Session Status Indicator */}
+          {sessionActive && !sessionPaused && (
+            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg shadow-lg">
+              <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+              <span className="text-white font-semibold text-sm">RECORDING ACTIVE</span>
+            </div>
+          )}
 
-            {/* Assessment iframe - full height */}
-            <iframe
-              src="https://charcot.lovable.app/"
-              title="Psychiatric Assessment with Camera"
-              className="w-full border-0"
-              style={{ height: '200vh' }}
-              allow="microphone; camera; fullscreen"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-            />
-          </div>
-        )}
+          {/* Assessment iframe - full height */}
+          <iframe
+            src="https://charcot.lovable.app/"
+            title="Psychiatric Assessment with Camera"
+            className="w-full border-0"
+            style={{ height: '200vh' }}
+            allow="microphone; camera; fullscreen"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+          />
+        </div>
 
-        {/* Page 2: Live Monitor & Statistics */}
-        {activePage === 'monitor' && (
-          <>
+        {/* Page 2: Live Monitor & Statistics - Always mounted, controlled by CSS visibility */}
+        <div className={activePage === 'monitor' ? '' : 'hidden'}>
             {/* Session Controls - Only on Monitor page */}
             <div className="bg-white border-y border-gray-200 p-4 mb-6 flex items-center justify-center gap-3">
               {!sessionActive ? (
@@ -1356,8 +1353,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
 
             </div>
           </div>
-          </>
-        )}
+        </div>
       </div>
     </div>
   );
