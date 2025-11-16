@@ -934,12 +934,12 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                 ) : (
                   <div ref={statisticsRef} className="space-y-6">
                     {/* Page Header */}
-                    <div className="bg-gradient-to-r from-therapy-primary to-therapy-secondary text-white rounded-xl p-8">
+                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-8">
                       <div className="flex items-center gap-3 mb-4">
-                        <BarChart3 className="w-10 h-10" />
-                        <h1 className="text-3xl font-bold">Final Statistics</h1>
+                        <BarChart3 className="w-10 h-10 text-black" />
+                        <h1 className="text-3xl font-bold text-black">Final Statistics</h1>
                       </div>
-                      <p className="text-purple-100">Comprehensive session metrics and behavioral analysis</p>
+                      <p className="text-black font-semibold">Comprehensive session metrics and behavioral analysis</p>
                     </div>
 
                     {/* Session Summary Cards */}

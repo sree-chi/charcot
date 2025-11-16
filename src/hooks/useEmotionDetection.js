@@ -179,20 +179,20 @@ export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
       }
     };
 
-    // Run emotion detection every 3 seconds (synced with metrics collection)
-    console.log('⏰ Setting up emotion detection interval (every 3 seconds)...');
+    // Run emotion detection every 1 second for real-time updates
+    console.log('⏰ Setting up emotion detection interval (every 1 second)...');
     detectionIntervalRef.current = setInterval(() => {
       console.log('⏰ Interval triggered - calling detectEmotions');
       detectEmotions();
-    }, 3000);
+    }, 1000);
     console.log('✓ Interval set, ID:', detectionIntervalRef.current);
 
-    // Initial detection after 3 seconds to ensure video is ready
-    console.log('⏰ Setting up initial detection timeout (3 seconds)...');
+    // Initial detection after 2 seconds to ensure video is ready
+    console.log('⏰ Setting up initial detection timeout (2 seconds)...');
     initialTimeoutRef.current = setTimeout(() => {
       console.log('🎬 Initial timeout triggered - running first emotion detection...');
       detectEmotions();
-    }, 3000);
+    }, 2000);
     console.log('✓ Timeout set, ID:', initialTimeoutRef.current);
 
     return () => {
