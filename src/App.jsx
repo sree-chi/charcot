@@ -872,11 +872,11 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                 {/* Real-time Metrics */}
                 <div className="grid grid-cols-4 gap-4">
                   {/* Eye Contact */}
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-5">
+                  <div className="rounded-lg p-5 border-2" style={{ backgroundColor: '#f0f4f8', borderColor: '#052640' }}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Eye className="w-4 h-4 text-blue-600" />
-                        <span className="font-semibold text-gray-700 text-sm">Eye Contact</span>
+                        <Eye className="w-4 h-4" style={{ color: '#052640' }} />
+                        <span className="font-semibold text-sm" style={{ color: '#052640' }}>Eye Contact</span>
                       </div>
                       <CheckCircle className={`w-4 h-4 ${getEyeContactStatus()}`} />
                     </div>
@@ -889,11 +889,11 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                   </div>
 
                   {/* Breathing Rate */}
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-5">
+                  <div className="rounded-lg p-5 border-2" style={{ backgroundColor: '#f0f4f8', borderColor: '#052640' }}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-green-600" />
-                        <span className="font-semibold text-gray-700 text-sm">Breathing Rate</span>
+                        <Activity className="w-4 h-4" style={{ color: '#052640' }} />
+                        <span className="font-semibold text-sm" style={{ color: '#052640' }}>Breathing Rate</span>
                       </div>
                       <CheckCircle className={`w-4 h-4 ${getBreathingStatus()}`} />
                     </div>
@@ -906,11 +906,11 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                   </div>
 
                   {/* Gaze Stability */}
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-5">
+                  <div className="rounded-lg p-5 border-2" style={{ backgroundColor: '#f0f4f8', borderColor: '#052640' }}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Camera className="w-4 h-4 text-purple-600" />
-                        <span className="font-semibold text-gray-700 text-sm">Gaze Stability</span>
+                        <Camera className="w-4 h-4" style={{ color: '#052640' }} />
+                        <span className="font-semibold text-sm" style={{ color: '#052640' }}>Gaze Stability</span>
                       </div>
                       <CheckCircle className={`w-4 h-4 ${getGazeStatus()}`} />
                     </div>
@@ -923,15 +923,15 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                   </div>
 
                   {/* Current Emotion */}
-                  <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-5">
+                  <div className="rounded-lg p-5 border-2" style={{ backgroundColor: '#f0f4f8', borderColor: '#052640' }}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Smile className="w-4 h-4 text-amber-600" />
-                        <span className="font-semibold text-gray-700 text-sm">Current Emotion</span>
+                        <Smile className="w-4 h-4" style={{ color: '#052640' }} />
+                        <span className="font-semibold text-sm" style={{ color: '#052640' }}>Current Emotion</span>
                       </div>
-                      <CheckCircle className={`w-4 h-4 ${isModelLoaded ? 'text-amber-600' : 'text-gray-400'}`} />
+                      <CheckCircle className={`w-4 h-4 ${isModelLoaded ? 'text-green-500' : 'text-gray-400'}`} />
                     </div>
-                    <div className="text-2xl font-bold text-amber-700 capitalize">
+                    <div className="text-2xl font-bold capitalize" style={{ color: '#052640' }}>
                       {currentEmotion}
                     </div>
                     <div className="text-xs text-gray-600 mt-1">
@@ -953,17 +953,17 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                         />
                         <YAxis />
                         <Tooltip />
-                        <Line 
-                          type="monotone" 
-                          dataKey="breathing" 
-                          stroke="#10b981" 
+                        <Line
+                          type="monotone"
+                          dataKey="breathing"
+                          stroke="#052640"
                           strokeWidth={2}
                           name="Breathing (bpm)"
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="eyeContact" 
-                          stroke="#3b82f6" 
+                        <Line
+                          type="monotone"
+                          dataKey="eyeContact"
+                          stroke="#0a4d80"
                           strokeWidth={2}
                           name="Eye Contact (%)"
                         />
@@ -1031,21 +1031,21 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
 
                     {/* Session Summary Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="bg-white border-2 border-blue-200 rounded-lg p-6">
+                      <div className="bg-white rounded-lg p-6 border-2" style={{ borderColor: '#052640' }}>
                         <div className="flex items-center gap-2 mb-2">
-                          <Activity className="w-5 h-5 text-blue-600" />
-                          <p className="text-sm font-medium text-gray-600">Session Duration</p>
+                          <Activity className="w-5 h-5" style={{ color: '#052640' }} />
+                          <p className="text-sm font-medium" style={{ color: '#052640' }}>Session Duration</p>
                         </div>
-                        <p className="text-3xl font-bold text-gray-900">{sessionReport.duration}</p>
+                        <p className="text-3xl font-bold" style={{ color: '#052640' }}>{sessionReport.duration}</p>
                         <p className="text-xs text-gray-500 mt-1">{sessionReport.statistics?.dataPoints || 0} data points</p>
                       </div>
 
-                      <div className="bg-white border-2 border-green-200 rounded-lg p-6">
+                      <div className="bg-white rounded-lg p-6 border-2" style={{ borderColor: '#052640' }}>
                         <div className="flex items-center gap-2 mb-2">
-                          <Eye className="w-5 h-5 text-green-600" />
-                          <p className="text-sm font-medium text-gray-600">Avg Eye Contact</p>
+                          <Eye className="w-5 h-5" style={{ color: '#052640' }} />
+                          <p className="text-sm font-medium" style={{ color: '#052640' }}>Avg Eye Contact</p>
                         </div>
-                        <p className="text-3xl font-bold text-gray-900">
+                        <p className="text-3xl font-bold" style={{ color: '#052640' }}>
                           {sessionReport.statistics?.eyeContact.avg.toFixed(1) || 0}%
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
@@ -1053,12 +1053,12 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                         </p>
                       </div>
 
-                      <div className="bg-white border-2 border-purple-200 rounded-lg p-6">
+                      <div className="bg-white rounded-lg p-6 border-2" style={{ borderColor: '#052640' }}>
                         <div className="flex items-center gap-2 mb-2">
-                          <Activity className="w-5 h-5 text-purple-600" />
-                          <p className="text-sm font-medium text-gray-600">Avg Breathing</p>
+                          <Activity className="w-5 h-5" style={{ color: '#052640' }} />
+                          <p className="text-sm font-medium" style={{ color: '#052640' }}>Avg Breathing</p>
                         </div>
-                        <p className="text-3xl font-bold text-gray-900">
+                        <p className="text-3xl font-bold" style={{ color: '#052640' }}>
                           {sessionReport.statistics?.breathing.avg.toFixed(1) || 0} bpm
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
@@ -1066,12 +1066,12 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                         </p>
                       </div>
 
-                      <div className="bg-white border-2 border-red-200 rounded-lg p-6">
+                      <div className="bg-white rounded-lg p-6 border-2" style={{ borderColor: '#052640' }}>
                         <div className="flex items-center gap-2 mb-2">
-                          <AlertCircle className="w-5 h-5 text-red-600" />
-                          <p className="text-sm font-medium text-gray-600">Total Alerts</p>
+                          <AlertCircle className="w-5 h-5" style={{ color: '#052640' }} />
+                          <p className="text-sm font-medium" style={{ color: '#052640' }}>Total Alerts</p>
                         </div>
-                        <p className="text-3xl font-bold text-gray-900">{alerts.length}</p>
+                        <p className="text-3xl font-bold" style={{ color: '#052640' }}>{alerts.length}</p>
                         <p className="text-xs text-gray-500 mt-1">
                           {alerts.filter(a => a.severity === 'critical').length} critical, {alerts.filter(a => a.severity === 'warning').length} warnings
                         </p>
@@ -1089,9 +1089,9 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                               <XAxis dataKey="time" label={{ value: 'Time (minutes)', position: 'insideBottom', offset: -5 }} />
                               <YAxis label={{ value: 'Value', angle: -90, position: 'insideLeft' }} />
                               <Tooltip />
-                              <Line type="monotone" dataKey="eyeContact" stroke="#3b82f6" name="Eye Contact %" strokeWidth={2} />
-                              <Line type="monotone" dataKey="breathing" stroke="#8b5cf6" name="Breathing (bpm)" strokeWidth={2} />
-                              <Line type="monotone" dataKey="gaze" stroke="#10b981" name="Gaze Stability %" strokeWidth={2} />
+                              <Line type="monotone" dataKey="eyeContact" stroke="#052640" name="Eye Contact %" strokeWidth={2} />
+                              <Line type="monotone" dataKey="breathing" stroke="#0a4d80" name="Breathing (bpm)" strokeWidth={2} />
+                              <Line type="monotone" dataKey="gaze" stroke="#1a6bb3" name="Gaze Stability %" strokeWidth={2} />
                             </LineChart>
                           </ResponsiveContainer>
                         ) : (
@@ -1136,7 +1136,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                                   <XAxis dataKey="range" />
                                   <YAxis label={{ value: 'Frequency', angle: -90, position: 'insideLeft' }} />
                                   <Tooltip />
-                                  <Bar dataKey="count" fill="#3b82f6" name="Count" />
+                                  <Bar dataKey="count" fill="#052640" name="Count" />
                                 </BarChart>
                               </ResponsiveContainer>
                             );
@@ -1176,7 +1176,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                                   <XAxis dataKey="range" />
                                   <YAxis label={{ value: 'Frequency', angle: -90, position: 'insideLeft' }} />
                                   <Tooltip />
-                                  <Bar dataKey="count" fill="#8b5cf6" name="Count" />
+                                  <Bar dataKey="count" fill="#052640" name="Count" />
                                 </BarChart>
                               </ResponsiveContainer>
                             );

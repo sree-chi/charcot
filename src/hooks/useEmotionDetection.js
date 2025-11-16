@@ -75,38 +75,26 @@ export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
     });
 
     const detectEmotions = async () => {
-      console.log('🎯 detectEmotions called at', new Date().toLocaleTimeString());
-
       if (!videoRef.current) {
-        console.log('⚠️ Video ref not available');
         return;
       }
-      console.log('✓ Video ref exists');
 
       // Wait for video to be ready with actual frames
       const readyState = videoRef.current.readyState;
-      console.log('📹 Video readyState:', readyState,
-                  '(0=nothing, 1=metadata, 2=current, 3=future, 4=enough)');
       if (readyState < 2) {
-        console.log('⚠️ Video not ready yet, waiting...');
         return;
       }
 
       // Check if video has actual dimensions
       const width = videoRef.current.videoWidth;
       const height = videoRef.current.videoHeight;
-      console.log('📐 Video dimensions:', width, 'x', height);
       if (width === 0 || height === 0) {
-        console.log('⚠️ Video has no dimensions yet');
         return;
       }
-      console.log('✓ Video ready for detection');
 
       try {
         // Double-check models are loaded
         if (!faceapi.nets.tinyFaceDetector.isLoaded || !faceapi.nets.faceExpressionNet.isLoaded) {
-          console.error('❌ Models not loaded! TinyFaceDetector:', faceapi.nets.tinyFaceDetector.isLoaded,
-                       'FaceExpression:', faceapi.nets.faceExpressionNet.isLoaded);
           return;
         }
 
@@ -127,30 +115,20 @@ export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
         ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
         ctx.restore();
 
-        console.log('🎨 Canvas prepared:', canvas.width, 'x', canvas.height);
-
         // Use more sensitive detection options
         const options = new faceapi.TinyFaceDetectorOptions({
           inputSize: 416,  // Larger = more accurate (128, 224, 320, 416, 512, 608)
           scoreThreshold: 0.4  // Lower = more sensitive (0-1)
         });
 
-        console.log('🔍 Running face detection with options:', options);
-
         // Detect face with expressions using canvas instead of video element
         const detections = await faceapi
           .detectSingleFace(canvas, options)
           .withFaceExpressions();
 
-        console.log('🔍 Detection result:', detections ? 'Face found' : 'No face');
-
         if (detections && detections.expressions) {
           // Get the dominant emotion
           const expressions = detections.expressions;
-
-          // Log all expressions for debugging
-          console.log('📊 All expressions:', expressions);
-
           const emotionEntries = Object.entries(expressions);
 
           // Find emotion with highest confidence
@@ -162,38 +140,25 @@ export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
           setCurrentEmotion(dominantEmotion);
           setEmotionConfidence(Math.round(confidence * 100));
 
-          console.log(`😊 Detected emotion: ${dominantEmotion} (${Math.round(confidence * 100)}%)`);
-          console.log(`   Top 3: ${emotionEntries
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([e, c]) => `${e}:${Math.round(c * 100)}%`)
-            .join(', ')}`);
-        } else {
-          console.log('⚠️ No face detected for emotion analysis');
-          console.log('   Video dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
-          console.log('   Video playing:', !videoRef.current.paused);
+          // Only log occasionally (every 5 seconds)
+          if (Math.random() < 0.2) {
+            console.log(`😊 Emotion: ${dominantEmotion} (${Math.round(confidence * 100)}%)`);
+          }
         }
       } catch (error) {
-        console.error('❌ Error detecting emotions:', error);
-        console.error('   Error details:', error.message);
+        // Silently fail - don't spam console
       }
     };
 
     // Run emotion detection every 1 second for real-time updates
-    console.log('⏰ Setting up emotion detection interval (every 1 second)...');
     detectionIntervalRef.current = setInterval(() => {
-      console.log('⏰ Interval triggered - calling detectEmotions');
       detectEmotions();
     }, 1000);
-    console.log('✓ Interval set, ID:', detectionIntervalRef.current);
 
     // Initial detection after 2 seconds to ensure video is ready
-    console.log('⏰ Setting up initial detection timeout (2 seconds)...');
     initialTimeoutRef.current = setTimeout(() => {
-      console.log('🎬 Initial timeout triggered - running first emotion detection...');
       detectEmotions();
     }, 2000);
-    console.log('✓ Timeout set, ID:', initialTimeoutRef.current);
 
     return () => {
       if (detectionIntervalRef.current) {
