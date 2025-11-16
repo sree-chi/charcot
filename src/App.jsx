@@ -683,16 +683,18 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
               onClick={() => setShowConsentModal(false)}
               disabled={!patientConsent}
               className={`flex-1 py-3 rounded-lg font-semibold transition ${
-                patientConsent 
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                patientConsent
+                  ? 'text-white hover:opacity-90'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
+              style={patientConsent ? { backgroundColor: '#052640' } : undefined}
             >
               Begin Session
             </button>
             <button
               onClick={() => alert('Session cancelled. No data collected.')}
-              className="px-6 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition"
+              className="px-6 py-3 rounded-lg font-semibold text-white hover:opacity-80 transition"
+              style={{ backgroundColor: '#052640', opacity: 0.7 }}
             >
               Decline
             </button>
@@ -822,14 +824,16 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                   </div>
                   <button
                     onClick={pauseSession}
-                    className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition"
+                    className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90 transition"
+                    style={{ backgroundColor: '#052640' }}
                   >
                     {sessionPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
                     {sessionPaused ? 'Resume Recording' : 'Pause Recording'}
                   </button>
                   <button
                     onClick={endSession}
-                    className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+                    className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90 transition"
+                    style={{ backgroundColor: '#052640' }}
                   >
                     <StopCircle className="w-5 h-5" />
                     End Recording
@@ -1329,14 +1333,16 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                       <div className="flex gap-4">
                         <button
                           onClick={exportReport}
-                          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                          className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90 transition"
+                          style={{ backgroundColor: '#052640' }}
                         >
                           <Download className="w-5 h-5" />
                           Export as JSON
                         </button>
                         <button
                           onClick={exportToPDF}
-                          className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition"
+                          className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90 transition"
+                          style={{ backgroundColor: '#052640' }}
                         >
                           <Download className="w-5 h-5" />
                           Export as PDF
