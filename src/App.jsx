@@ -37,6 +37,9 @@ const App = () => {
   const [cameraPosition, setCameraPosition] = useState({ x: window.innerWidth - 260, y: window.innerHeight - 300 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Page navigation state
+  const [activePage, setActivePage] = useState('assessment'); // 'assessment' or 'monitor'
   
   // Refs
   const videoRef = useRef(null);
@@ -701,6 +704,39 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Floating Page Switcher - Redesigned to be less intrusive */}
+      <div
+        className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[9999] flex gap-1 bg-white/95 backdrop-blur-sm rounded-full shadow-2xl p-1.5 border border-gray-300"
+        style={{ fontFamily: 'Manrope, sans-serif' }}
+      >
+        <button
+          onClick={() => setActivePage('assessment')}
+          className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 ${
+            activePage === 'assessment'
+              ? 'text-white shadow-lg'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+          style={{
+            backgroundColor: activePage === 'assessment' ? '#052640' : 'transparent'
+          }}
+        >
+          Assessment
+        </button>
+        <button
+          onClick={() => setActivePage('monitor')}
+          className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 ${
+            activePage === 'monitor'
+              ? 'text-white shadow-lg'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+          style={{
+            backgroundColor: activePage === 'monitor' ? '#052640' : 'transparent'
+          }}
+        >
+          Live Monitor
+        </button>
+      </div>
+
       {/* Main Content */}
       <div className="w-full">
         {/* Session Paused Notice */}
@@ -741,88 +777,96 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
           }}
         />
 
-        {/* Fullscreen Psychiatric Assessment iframe */}
-        <div className="relative w-full">
-          {/* Session Status Indicator */}
-          {sessionActive && !sessionPaused && (
-            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg shadow-lg">
-              <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-              <span className="text-white font-semibold text-sm">RECORDING ACTIVE</span>
-            </div>
-          )}
-
-          {/* Assessment iframe - full height without scrollbar */}
-          <iframe
-            src="https://charcot.lovable.app/"
-            title="Psychiatric Assessment with Camera"
-            className="w-full border-0"
-            style={{ height: '200vh' }}
-            allow="microphone; camera; fullscreen"
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-          />
-        </div>
-
-        {/* Session Controls - Below iframe */}
-        <div className="bg-white border-y border-gray-200 p-4 flex items-center justify-center gap-3">
-          {!sessionActive ? (
-            <button
-              onClick={startSession}
-              className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
-            >
-              <Play className="w-5 h-5" />
-              Start Recording
-            </button>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 px-4 py-2 bg-green-100 rounded-lg">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="font-mono font-semibold text-green-800">{formatDuration(sessionDuration)}</span>
+        {/* Page 1: Assessment iframe */}
+        {activePage === 'assessment' && (
+          <div className="relative w-full">
+            {/* Session Status Indicator */}
+            {sessionActive && !sessionPaused && (
+              <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg shadow-lg">
+                <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                <span className="text-white font-semibold text-sm">RECORDING ACTIVE</span>
               </div>
-              <button
-                onClick={pauseSession}
-                className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition"
-              >
-                {sessionPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-                {sessionPaused ? 'Resume Recording' : 'Pause Recording'}
-              </button>
-              <button
-                onClick={endSession}
-                className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
-              >
-                <StopCircle className="w-5 h-5" />
-                End Recording
-              </button>
-            </>
-          )}
-        </div>
+            )}
 
-        {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-md mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex gap-2 px-6">
-              {[
-                { id: 'monitor', label: 'Live Monitor & Assessment', icon: Activity },
-                { id: 'statistics', label: 'Final Statistics', icon: BarChart3 }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-6 py-4 border-b-2 font-semibold transition ${
-                    activeTab === tab.id
-                      ? 'border-indigo-600 text-indigo-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <tab.icon className="w-5 h-5" />
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
+            {/* Assessment iframe - full height */}
+            <iframe
+              src="https://charcot.lovable.app/"
+              title="Psychiatric Assessment with Camera"
+              className="w-full border-0"
+              style={{ height: '200vh' }}
+              allow="microphone; camera; fullscreen"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+            />
           </div>
+        )}
 
-          <div className="p-6">
-            {/* Live Monitor Tab */}
-            {activeTab === 'monitor' && (
+        {/* Page 2: Live Monitor & Statistics */}
+        {activePage === 'monitor' && (
+          <>
+            {/* Session Controls - Only on Monitor page */}
+            <div className="bg-white border-y border-gray-200 p-4 mb-6 flex items-center justify-center gap-3">
+              {!sessionActive ? (
+                <button
+                  onClick={startSession}
+                  className="flex items-center gap-2 px-8 py-3 text-white rounded-lg font-semibold hover:opacity-90 transition"
+                  style={{ backgroundColor: '#052640' }}
+                >
+                  <Play className="w-5 h-5" />
+                  Start Recording
+                </button>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-green-100 rounded-lg">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="font-mono font-semibold text-green-800">{formatDuration(sessionDuration)}</span>
+                  </div>
+                  <button
+                    onClick={pauseSession}
+                    className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition"
+                  >
+                    {sessionPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+                    {sessionPaused ? 'Resume Recording' : 'Pause Recording'}
+                  </button>
+                  <button
+                    onClick={endSession}
+                    className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+                  >
+                    <StopCircle className="w-5 h-5" />
+                    End Recording
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md mb-6" style={{ fontFamily: 'Manrope, sans-serif' }}>
+              <div className="border-b border-gray-200">
+                <nav className="flex gap-2 px-6">
+                {[
+                  { id: 'monitor', label: 'Live Monitor', icon: Activity },
+                  { id: 'statistics', label: 'Final Statistics', icon: BarChart3 }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-6 py-4 border-b-2 font-semibold transition ${
+                      activeTab === tab.id
+                        ? 'border-[#052640]'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                    style={{
+                      color: activeTab === tab.id ? '#052640' : undefined
+                    }}
+                  >
+                    <tab.icon className="w-5 h-5" />
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div className="p-6">
+              {/* Live Monitor Tab */}
+              {activeTab === 'monitor' && (
               <div className="space-y-6">
                 {/* Real-time Metrics */}
                 <div className="grid grid-cols-4 gap-4">
@@ -976,12 +1020,12 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                 ) : (
                   <div ref={statisticsRef} className="space-y-6">
                     {/* Page Header */}
-                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-8">
+                    <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-8 border border-gray-200">
                       <div className="flex items-center gap-3 mb-4">
-                        <BarChart3 className="w-10 h-10 text-black" />
-                        <h1 className="text-3xl font-bold text-black">Final Statistics</h1>
+                        <BarChart3 className="w-10 h-10" style={{ color: '#052640' }} />
+                        <h1 className="text-3xl font-bold" style={{ color: '#052640' }}>Final Statistics</h1>
                       </div>
-                      <p className="text-black font-semibold">Comprehensive session metrics and behavioral analysis</p>
+                      <p className="text-gray-600 font-medium">Comprehensive session metrics and behavioral analysis</p>
                     </div>
 
                     {/* Session Summary Cards */}
@@ -1304,8 +1348,10 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
               </div>
             )}
 
+            </div>
           </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
