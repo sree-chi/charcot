@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, FileText, BarChart3 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar } from 'recharts';
+import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, FileText, BarChart3, ClipboardList } from 'lucide-react';
 import { useComputerVision } from './hooks/useComputerVision';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const App = () => {
   // Session State
@@ -33,6 +35,7 @@ const App = () => {
   const metricsIntervalRef = useRef(null);
   const insightsIntervalRef = useRef(null);
   const currentMetricsRef = useRef({ eyeContact: 0, breathingRate: 0, gazeStability: 0, sessionDuration: 0 });
+  const statisticsRef = useRef(null);
 
   // Patient Profile
   const [patientId] = useState(Math.floor(Math.random() * 9000) + 1000);
@@ -52,18 +55,38 @@ const App = () => {
 
   // Initialize webcam
   useEffect(() => {
-    if (sessionActive && !sessionPaused && videoRef.current) {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          videoRef.current.srcObject = stream;
-          setVideoStream(stream);
-        })
-        .catch(err => console.error('Error accessing webcam:', err));
-    }
-    
+    const initWebcam = async () => {
+      if (sessionActive && !sessionPaused && videoRef.current) {
+        try {
+          console.log('🎥 Requesting webcam access...');
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480 }
+          });
+          console.log('✅ Webcam access granted');
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            setVideoStream(stream);
+
+            // Ensure video plays
+            await videoRef.current.play();
+            console.log('▶️ Video playing for computer vision');
+          }
+        } catch (err) {
+          console.error('❌ Error accessing webcam:', err);
+          alert('Unable to access webcam. Please ensure camera permissions are granted.');
+        }
+      }
+    };
+
+    initWebcam();
+
+    // Cleanup when session ends
     return () => {
-      if (videoStream) {
+      if (!sessionActive && videoStream) {
+        console.log('🛑 Stopping webcam stream');
         videoStream.getTracks().forEach(track => track.stop());
+        setVideoStream(null);
       }
     };
   }, [sessionActive, sessionPaused]);
@@ -76,7 +99,17 @@ const App = () => {
       gazeStability,
       sessionDuration
     };
-  }, [eyeContact, breathingRate, gazeStability, sessionDuration]);
+
+    // Debug: Log metrics updates
+    if (sessionActive && !sessionPaused) {
+      console.log('📊 Metrics Update:', {
+        eyeContact: Math.round(eyeContact),
+        breathingRate: Math.round(breathingRate),
+        gazeStability: Math.round(gazeStability),
+        sessionDuration
+      });
+    }
+  }, [eyeContact, breathingRate, gazeStability, sessionDuration, sessionActive, sessionPaused]);
 
   // Session timer
   useEffect(() => {
@@ -402,7 +435,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
 
   const exportReport = () => {
     if (!sessionReport) return;
-    
+
     const reportData = {
       sessionId: `SESSION_${patientId}_${sessionReport.timestamp.getTime()}`,
       patientId: `Anonymous #${patientId}`,
@@ -417,13 +450,58 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
       timeline: sessionReport.timeline,
       disclaimer: 'This report contains anonymized behavioral metrics only. No audio or video data was stored.'
     };
-    
+
     const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `therapylens_report_${patientId}_${Date.now()}.json`;
     a.click();
+  };
+
+  const exportToPDF = async () => {
+    if (!statisticsRef.current || !sessionReport) return;
+
+    try {
+      // Temporarily show a loading indicator
+      const originalTab = activeTab;
+      if (activeTab !== 'statistics') {
+        setActiveTab('statistics');
+        // Wait for the tab to render
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Capture the statistics section as canvas
+      const canvas = await html2canvas(statisticsRef.current, {
+        scale: 2, // Higher quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      // Calculate PDF dimensions
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      // Create PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgData = canvas.toDataURL('image/png');
+
+      // Add image to PDF
+      let position = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+
+      // Save PDF
+      pdf.save(`therapylens_statistics_${patientId}_${Date.now()}.pdf`);
+
+      // Restore original tab if we changed it
+      if (originalTab !== 'statistics') {
+        setActiveTab(originalTab);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
   };
 
   const deleteSessionData = () => {
@@ -541,24 +619,51 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Eye className="w-8 h-8 text-indigo-600" />
+              <ClipboardList className="w-8 h-8 text-indigo-600" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">TherapyLens</h1>
-                <p className="text-sm text-gray-500">Real-Time Behavioral Tracking</p>
+                <h1 className="text-2xl font-bold text-gray-800">Charcot</h1>
+                <p className="text-sm text-gray-500">Clinical Decision Support</p>
+              </div>
+              <div className="ml-6 text-sm text-gray-600">
+                Patient: <span className="font-semibold">#{patientId}</span>
               </div>
             </div>
-            
-            <div className="flex items-center gap-4">
+
+            <div className="flex items-center gap-3">
               {sessionActive && (
                 <div className="flex items-center gap-2 px-4 py-2 bg-green-100 rounded-lg">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                   <span className="font-mono font-semibold text-green-800">{formatDuration(sessionDuration)}</span>
                 </div>
               )}
-              
-              <div className="text-sm text-gray-600">
-                Patient: <span className="font-semibold">#{patientId}</span>
-              </div>
+
+              {/* Session Controls */}
+              {!sessionActive ? (
+                <button
+                  onClick={startSession}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition text-sm"
+                >
+                  <Play className="w-4 h-4" />
+                  Start Session
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={pauseSession}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition text-sm"
+                  >
+                    {sessionPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                    {sessionPaused ? 'Resume' : 'Pause'}
+                  </button>
+                  <button
+                    onClick={endSession}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition text-sm"
+                  >
+                    <StopCircle className="w-4 h-4" />
+                    End Session
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -634,29 +739,56 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
 
 
         {/* Video element - always rendered for computer vision */}
+        {/* Hidden video for computer vision - still runs for behavioral tracking */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          width="640"
+          height="480"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '640px',
+            height: '480px',
+            opacity: 0,
+            pointerEvents: 'none',
+            zIndex: -1
+          }}
+        />
+
+        {/* Psychiatric Assessment iframe - replaces visible camera */}
         <div className={activeTab === 'monitor' ? '' : 'hidden'}>
-          <div className="bg-white rounded-xl shadow-md mb-6">
-            <div className="bg-gray-900 rounded-lg overflow-hidden aspect-video relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                className="w-full h-full object-cover"
-              />
+          <div className="bg-white rounded-xl shadow-md mb-6 overflow-hidden">
+            <div className="relative">
+              {/* Session Status Indicator */}
               {sessionActive && !sessionPaused && (
-                <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg">
+                <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-red-600 px-3 py-2 rounded-lg shadow-lg">
                   <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
                   <span className="text-white font-semibold text-sm">TRACKING ACTIVE</span>
                 </div>
               )}
-              {!sessionActive && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                  <div className="text-center">
-                    <Camera className="w-16 h-16 text-white mx-auto mb-3 opacity-50" />
-                    <p className="text-white text-lg font-semibold">Start session to begin tracking</p>
-                  </div>
+
+              {/* Assessment iframe */}
+              <div style={{ height: '500px' }}>
+                <iframe
+                  src="https://charcot.lovable.app/"
+                  title="Psychiatric Assessment with Camera"
+                  className="w-full h-full border-0"
+                  allow="microphone; camera; fullscreen"
+                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+                />
+              </div>
+
+              {/* Info badge */}
+              <div className="absolute bottom-4 right-4 bg-therapy-primary/90 text-white px-3 py-1.5 rounded-lg text-xs backdrop-blur-sm">
+                <div className="flex items-center gap-1.5">
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  <span className="font-medium">Psychiatric Assessment</span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -666,7 +798,7 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
           <div className="border-b border-gray-200">
             <nav className="flex gap-2 px-6">
               {[
-                { id: 'monitor', label: 'Live Monitor', icon: Activity },
+                { id: 'monitor', label: 'Live Monitor & Assessment', icon: Activity },
                 { id: 'statistics', label: 'Final Statistics', icon: BarChart3 },
                 { id: 'report', label: 'Session Report', icon: FileText }
               ].map(tab => (
@@ -781,11 +913,11 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                   <div className="space-y-2">
                     <h3 className="font-semibold text-gray-800">Recent Alerts</h3>
                     {alerts.slice(-5).reverse().map(alert => (
-                      <div 
+                      <div
                         key={alert.id}
                         className={`flex items-start gap-3 p-4 rounded-lg border-l-4 ${
-                          alert.severity === 'critical' 
-                            ? 'bg-red-50 border-red-500' 
+                          alert.severity === 'critical'
+                            ? 'bg-red-50 border-red-500'
                             : 'bg-yellow-50 border-yellow-500'
                         }`}
                       >
@@ -803,6 +935,21 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                     ))}
                   </div>
                 )}
+
+                {/* Privacy & Info Notice */}
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-blue-800 mb-1">Integrated Assessment & Tracking</p>
+                      <p className="text-sm text-blue-700">
+                        The psychiatric assessment tool above is externally hosted. Your behavioral metrics
+                        (eye contact, breathing, gaze) are tracked locally via hidden camera for privacy.
+                        No video is recorded or transmitted.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -822,14 +969,14 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                     <p className="text-sm">Complete a session to view final statistics</p>
                   </div>
                 ) : (
-                  <div className="space-y-6">
+                  <div ref={statisticsRef} className="space-y-6">
                     {/* Page Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl p-8">
+                    <div className="bg-gradient-to-r from-therapy-primary to-therapy-secondary text-white rounded-xl p-8">
                       <div className="flex items-center gap-3 mb-4">
                         <BarChart3 className="w-10 h-10" />
                         <h1 className="text-3xl font-bold">Final Statistics</h1>
                       </div>
-                      <p className="text-blue-100">Comprehensive session metrics and behavioral analysis</p>
+                      <p className="text-purple-100">Comprehensive session metrics and behavioral analysis</p>
                     </div>
 
                     {/* Session Summary Cards */}
@@ -905,29 +1052,85 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                       </div>
                     </div>
 
-                    {/* Distribution Charts - Placeholder */}
+                    {/* Distribution Charts - Histograms */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Eye Contact Distribution */}
                       <div className="bg-white border border-gray-200 rounded-xl p-6">
                         <h3 className="text-lg font-bold text-gray-800 mb-4">Eye Contact Distribution</h3>
-                        <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
-                          <div className="text-center">
-                            <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                            <p className="text-gray-500 font-medium">Histogram Chart Placeholder</p>
-                            <p className="text-sm text-gray-400 mt-1">Add bar chart showing eye contact ranges</p>
-                          </div>
+                        <div className="h-64">
+                          {(() => {
+                            // Create histogram bins for eye contact
+                            const bins = [
+                              { range: '0-20%', min: 0, max: 20, count: 0 },
+                              { range: '20-40%', min: 20, max: 40, count: 0 },
+                              { range: '40-60%', min: 40, max: 60, count: 0 },
+                              { range: '60-80%', min: 60, max: 80, count: 0 },
+                              { range: '80-100%', min: 80, max: 100, count: 0 }
+                            ];
+
+                            metricsHistory.forEach(metric => {
+                              const ec = metric.eyeContact;
+                              bins.forEach(bin => {
+                                if (ec >= bin.min && ec < bin.max) {
+                                  bin.count++;
+                                } else if (ec === 100 && bin.max === 100) {
+                                  bin.count++;
+                                }
+                              });
+                            });
+
+                            return (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={bins}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="range" />
+                                  <YAxis label={{ value: 'Frequency', angle: -90, position: 'insideLeft' }} />
+                                  <Tooltip />
+                                  <Bar dataKey="count" fill="#3b82f6" name="Count" />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            );
+                          })()}
                         </div>
                       </div>
 
                       {/* Breathing Rate Distribution */}
                       <div className="bg-white border border-gray-200 rounded-xl p-6">
                         <h3 className="text-lg font-bold text-gray-800 mb-4">Breathing Rate Distribution</h3>
-                        <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
-                          <div className="text-center">
-                            <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                            <p className="text-gray-500 font-medium">Histogram Chart Placeholder</p>
-                            <p className="text-sm text-gray-400 mt-1">Add bar chart showing breathing rate ranges</p>
-                          </div>
+                        <div className="h-64">
+                          {(() => {
+                            // Create histogram bins for breathing rate
+                            const bins = [
+                              { range: '8-12 bpm', min: 8, max: 12, count: 0 },
+                              { range: '12-16 bpm', min: 12, max: 16, count: 0 },
+                              { range: '16-20 bpm', min: 16, max: 20, count: 0 },
+                              { range: '20-24 bpm', min: 20, max: 24, count: 0 },
+                              { range: '24-30 bpm', min: 24, max: 30, count: 0 }
+                            ];
+
+                            metricsHistory.forEach(metric => {
+                              const br = metric.breathing;
+                              bins.forEach(bin => {
+                                if (br >= bin.min && br < bin.max) {
+                                  bin.count++;
+                                } else if (br >= 30 && bin.max === 30) {
+                                  bin.count++;
+                                }
+                              });
+                            });
+
+                            return (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={bins}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="range" />
+                                  <YAxis label={{ value: 'Frequency', angle: -90, position: 'insideLeft' }} />
+                                  <Tooltip />
+                                  <Bar dataKey="count" fill="#8b5cf6" name="Count" />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -1082,9 +1285,12 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
                           <Download className="w-5 h-5" />
                           Export as JSON
                         </button>
-                        <button className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition">
+                        <button
+                          onClick={exportToPDF}
+                          className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition"
+                        >
                           <Download className="w-5 h-5" />
-                          Export as PDF (Coming Soon)
+                          Export as PDF
                         </button>
                       </div>
                     </div>

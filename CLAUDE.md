@@ -121,11 +121,11 @@ Hardcoded values in the `checkForAlerts` function that trigger behavioral alerts
 - Dissociation indicator: `gazeStability > 95%` (after 90s) → Warning
 - Anxiety indicator: `gazeStability < 30%` → Warning
 
-### Baseline Values (src/App.jsx:15-16)
+### Baseline Values (src/App.jsx:16-17)
 
 Default baseline values used for alert comparisons:
 - `baselineBreathing: 14` bpm
-- `baselineEyeContact: 45%`
+- `baselineEyeContact: 90%`
 
 These are hardcoded and cannot be adjusted through the UI (Patient Baseline tab was removed).
 
