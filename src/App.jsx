@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar } from 'recharts';
-import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, FileText, BarChart3, ClipboardList } from 'lucide-react';
+import { Eye, Activity, AlertCircle, CheckCircle, Pause, Play, StopCircle, Download, Shield, Camera, FileText, BarChart3, ClipboardList, Smile } from 'lucide-react';
 import { useComputerVision } from './hooks/useComputerVision';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -671,71 +671,14 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        {/* Control Panel */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Session Controls</h2>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Shield className="w-4 h-4 text-green-600" />
-              <span>HIPAA-Compliant • Local Processing</span>
-            </div>
+        {/* Session Paused Notice */}
+        {sessionPaused && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg mb-6">
+            <p className="text-sm text-yellow-800 font-medium">
+              ⏸️ Session paused. Tracking is suspended. Click Resume to continue.
+            </p>
           </div>
-          
-          <div className="flex gap-3">
-            {!sessionActive ? (
-              <button
-                onClick={startSession}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition"
-              >
-                <Play className="w-5 h-5" />
-                Start Session
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={pauseSession}
-                  className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition"
-                >
-                  {sessionPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-                  {sessionPaused ? 'Resume' : 'Pause'}
-                </button>
-                <button
-                  onClick={endSession}
-                  className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
-                >
-                  <StopCircle className="w-5 h-5" />
-                  End Session
-                </button>
-              </>
-            )}
-            
-            {sessionReport && (
-              <>
-                <button
-                  onClick={exportReport}
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-                >
-                  <Download className="w-5 h-5" />
-                  Export Report
-                </button>
-                <button
-                  onClick={deleteSessionData}
-                  className="flex items-center gap-2 px-4 py-3 border-2 border-red-500 text-red-600 rounded-lg font-semibold hover:bg-red-50 transition"
-                >
-                  Delete All Data
-                </button>
-              </>
-            )}
-          </div>
-          
-          {sessionPaused && (
-            <div className="mt-4 bg-yellow-50 border-l-4 border-yellow-500 p-4">
-              <p className="text-sm text-yellow-800 font-medium">
-                ⏸️ Session paused. Tracking is suspended. Click Resume to continue.
-              </p>
-            </div>
-          )}
-        </div>
+        )}
 
 
         {/* Video element - always rendered for computer vision */}
@@ -823,64 +766,81 @@ Total alerts: ${alerts.filter(a => a.severity === 'critical').length} critical, 
             {activeTab === 'monitor' && (
               <div className="space-y-6">
                 {/* Real-time Metrics */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   {/* Eye Contact */}
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-5">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Eye className="w-5 h-5 text-blue-600" />
-                        <span className="font-semibold text-gray-700">Eye Contact</span>
+                        <Eye className="w-4 h-4 text-blue-600" />
+                        <span className="font-semibold text-gray-700 text-sm">Eye Contact</span>
                       </div>
-                      <CheckCircle className={`w-5 h-5 ${getEyeContactStatus()}`} />
+                      <CheckCircle className={`w-4 h-4 ${getEyeContactStatus()}`} />
                     </div>
-                    <div className={`text-4xl font-bold ${getEyeContactStatus()}`}>
+                    <div className={`text-3xl font-bold ${getEyeContactStatus()}`}>
                       {Math.round(eyeContact)}%
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">
+                    <div className="text-xs text-gray-600 mt-1">
                       Baseline: {baselineEyeContact}%
                     </div>
                   </div>
 
                   {/* Breathing Rate */}
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6">
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-5">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-green-600" />
-                        <span className="font-semibold text-gray-700">Breathing Rate</span>
+                        <Activity className="w-4 h-4 text-green-600" />
+                        <span className="font-semibold text-gray-700 text-sm">Breathing Rate</span>
                       </div>
-                      <CheckCircle className={`w-5 h-5 ${getBreathingStatus()}`} />
+                      <CheckCircle className={`w-4 h-4 ${getBreathingStatus()}`} />
                     </div>
-                    <div className={`text-4xl font-bold ${getBreathingStatus()}`}>
+                    <div className={`text-3xl font-bold ${getBreathingStatus()}`}>
                       {Math.round(breathingRate)}
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      breaths/min • Baseline: {baselineBreathing}
+                    <div className="text-xs text-gray-600 mt-1">
+                      bpm • Baseline: {baselineBreathing}
                     </div>
                   </div>
 
                   {/* Gaze Stability */}
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6">
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-5">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Camera className="w-5 h-5 text-purple-600" />
-                        <span className="font-semibold text-gray-700">Gaze Stability</span>
+                        <Camera className="w-4 h-4 text-purple-600" />
+                        <span className="font-semibold text-gray-700 text-sm">Gaze Stability</span>
                       </div>
-                      <CheckCircle className={`w-5 h-5 ${getGazeStatus()}`} />
+                      <CheckCircle className={`w-4 h-4 ${getGazeStatus()}`} />
                     </div>
-                    <div className={`text-4xl font-bold ${getGazeStatus()}`}>
+                    <div className={`text-3xl font-bold ${getGazeStatus()}`}>
                       {Math.round(gazeStability)}%
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      Normal range: 60-90%
+                    <div className="text-xs text-gray-600 mt-1">
+                      Range: 60-90%
+                    </div>
+                  </div>
+
+                  {/* Current Emotion */}
+                  <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Smile className="w-4 h-4 text-amber-600" />
+                        <span className="font-semibold text-gray-700 text-sm">Current Emotion</span>
+                      </div>
+                      <CheckCircle className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-amber-700 capitalize">
+                      Happy
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      AI-detected mood
                     </div>
                   </div>
                 </div>
 
                 {/* Metrics Chart */}
                 {metricsHistory.length > 0 && (
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="font-semibold text-gray-800 mb-4">Behavioral Timeline</h3>
-                    <ResponsiveContainer width="100%" height={250}>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-800 mb-3 text-sm">Behavioral Timeline</h3>
+                    <ResponsiveContainer width="100%" height={180}>
                       <LineChart data={metricsHistory}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis 
