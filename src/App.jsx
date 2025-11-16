@@ -14,8 +14,8 @@ const App = () => {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [pausedTime, setPausedTime] = useState(0); // Track total paused duration
   const [lastPauseTime, setLastPauseTime] = useState(null); // Track when pause started
-  const [patientConsent, setPatientConsent] = useState(false);
-  const [showConsentModal, setShowConsentModal] = useState(true);
+  const [patientConsent, setPatientConsent] = useState(true);
+  const [showConsentModal, setShowConsentModal] = useState(false);
 
   // Behavioral Metrics - baselines
   const [baselineBreathing, setBaselineBreathing] = useState(14);
@@ -91,12 +91,17 @@ const App = () => {
 
     initWebcam();
 
-    // Cleanup when session ends
+    // Cleanup when session ends or component unmounts
     return () => {
-      if (!sessionActive && videoStream) {
-        console.log('🛑 Stopping webcam stream');
-        videoStream.getTracks().forEach(track => track.stop());
-        setVideoStream(null);
+      if (videoStream) {
+        console.log('🧹 Cleanup: Stopping webcam stream');
+        videoStream.getTracks().forEach(track => {
+          console.log('🔴 Cleanup: Stopping track:', track.kind);
+          track.stop();
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
       }
     };
   }, [sessionActive, sessionPaused]);
@@ -253,12 +258,25 @@ const App = () => {
   };
 
   const endSession = () => {
+    console.log('🛑 Ending session...');
+
     setSessionActive(false);
     setSessionPaused(false);
 
+    // Stop and cleanup video stream properly
     if (videoStream) {
-      videoStream.getTracks().forEach(track => track.stop());
+      console.log('📹 Stopping video stream...');
+      videoStream.getTracks().forEach(track => {
+        console.log('🔴 Stopping track:', track.kind, track.label);
+        track.stop();
+      });
       setVideoStream(null);
+    }
+
+    // Clear video element source
+    if (videoRef.current) {
+      console.log('🧹 Clearing video element...');
+      videoRef.current.srcObject = null;
     }
 
     addSessionEvent('Session ended', `Total duration: ${formatDuration(sessionDuration)}`);
@@ -269,6 +287,8 @@ const App = () => {
     setIsGeneratingReport(false);
     setShowReport(true);
     setActiveTab('statistics');
+
+    console.log('✅ Session ended and resources cleaned up');
   };
 
   const generateSessionReport = () => {

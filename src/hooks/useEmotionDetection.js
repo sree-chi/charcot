@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import * as faceapi from 'face-api.js';
+import * as faceapi from '@vladmandic/face-api';
 
 export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
   const [currentEmotion, setCurrentEmotion] = useState('neutral');
@@ -8,6 +8,7 @@ export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
 
   const detectionIntervalRef = useRef(null);
   const initialTimeoutRef = useRef(null);
+  const canvasRef = useRef(null);
 
   // Load face-api.js models from CDN
   useEffect(() => {
@@ -74,22 +75,32 @@ export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
     });
 
     const detectEmotions = async () => {
+      console.log('🎯 detectEmotions called at', new Date().toLocaleTimeString());
+
       if (!videoRef.current) {
         console.log('⚠️ Video ref not available');
         return;
       }
+      console.log('✓ Video ref exists');
 
       // Wait for video to be ready with actual frames
-      if (videoRef.current.readyState < 3) {
-        console.log('⚠️ Video not ready yet, readyState:', videoRef.current.readyState);
+      const readyState = videoRef.current.readyState;
+      console.log('📹 Video readyState:', readyState,
+                  '(0=nothing, 1=metadata, 2=current, 3=future, 4=enough)');
+      if (readyState < 2) {
+        console.log('⚠️ Video not ready yet, waiting...');
         return;
       }
 
       // Check if video has actual dimensions
-      if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+      const width = videoRef.current.videoWidth;
+      const height = videoRef.current.videoHeight;
+      console.log('📐 Video dimensions:', width, 'x', height);
+      if (width === 0 || height === 0) {
         console.log('⚠️ Video has no dimensions yet');
         return;
       }
+      console.log('✓ Video ready for detection');
 
       try {
         // Double-check models are loaded
@@ -99,6 +110,25 @@ export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
           return;
         }
 
+        // Create canvas and draw video frame to it (fixes TensorFlow.js compatibility)
+        if (!canvasRef.current) {
+          canvasRef.current = document.createElement('canvas');
+        }
+
+        const canvas = canvasRef.current;
+        const video = videoRef.current;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const ctx = canvas.getContext('2d');
+        // Draw video frame to canvas (undo the mirror transform for detection)
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.restore();
+
+        console.log('🎨 Canvas prepared:', canvas.width, 'x', canvas.height);
+
         // Use more sensitive detection options
         const options = new faceapi.TinyFaceDetectorOptions({
           inputSize: 416,  // Larger = more accurate (128, 224, 320, 416, 512, 608)
@@ -107,9 +137,9 @@ export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
 
         console.log('🔍 Running face detection with options:', options);
 
-        // Detect face with expressions
+        // Detect face with expressions using canvas instead of video element
         const detections = await faceapi
-          .detectSingleFace(videoRef.current, options)
+          .detectSingleFace(canvas, options)
           .withFaceExpressions();
 
         console.log('🔍 Detection result:', detections ? 'Face found' : 'No face');
@@ -150,13 +180,20 @@ export const useEmotionDetection = (videoRef, sessionActive, sessionPaused) => {
     };
 
     // Run emotion detection every 3 seconds (synced with metrics collection)
-    detectionIntervalRef.current = setInterval(detectEmotions, 3000);
-
-    // Initial detection after 3 seconds to ensure video is ready
-    initialTimeoutRef.current = setTimeout(() => {
-      console.log('🎬 Running initial emotion detection...');
+    console.log('⏰ Setting up emotion detection interval (every 3 seconds)...');
+    detectionIntervalRef.current = setInterval(() => {
+      console.log('⏰ Interval triggered - calling detectEmotions');
       detectEmotions();
     }, 3000);
+    console.log('✓ Interval set, ID:', detectionIntervalRef.current);
+
+    // Initial detection after 3 seconds to ensure video is ready
+    console.log('⏰ Setting up initial detection timeout (3 seconds)...');
+    initialTimeoutRef.current = setTimeout(() => {
+      console.log('🎬 Initial timeout triggered - running first emotion detection...');
+      detectEmotions();
+    }, 3000);
+    console.log('✓ Timeout set, ID:', initialTimeoutRef.current);
 
     return () => {
       if (detectionIntervalRef.current) {
